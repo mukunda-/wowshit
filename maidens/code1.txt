@@ -1,0 +1,86 @@
+-- maidens bomb monitor by mukunda
+
+wa_bmon_data = {}
+
+local data = wa_bmon_data
+data.times = {
+    
+    {0.0,"y"},
+    {1.0,"o"},
+    {2.0,"r"},
+    {4.35,"o"},
+    {4.85,"r"},
+    {7.2,"g"},
+    {7.95,"y"},
+    {8.95,"o"},
+    {9.95,"r"},
+    {12.50,"o"},
+    {12.85,"r"},
+    {15.05,"g"}
+}
+data.period = 18.186
+data.active = false
+data.show = false
+data.boat = false
+data.base_time = 0
+data.flytime = 3.2
+data.sabotime = 3.0
+
+data.omega_time = 2.905
+data.alpha_time = 17.2
+
+data.OnBoat = function()
+    local x, y = UnitPosition("player")
+    
+    return x >= 370 and x <= 550 and y >= 3240 and y <= 3347
+end 
+
+local region = WeakAuras.regions["Maidens Bomb Monitor"].region
+
+local x = 0
+local width = region:GetWidth()
+local height = region:GetHeight()
+width = width - height
+
+if wa_bmon_texes == nil then
+    wa_bmon_texes = {} 
+end
+
+for k,v in pairs(data.times) do 
+    
+    local tex 
+    if wa_bmon_texes[k] == nil then
+        wa_bmon_texes[k] = region.bar:CreateTexture()
+        
+    end
+    tex = wa_bmon_texes[k]
+    
+    --local tex = region.bar:CreateTexture()
+    local x = math.floor( data.times[k][1] / data.period * width + 0.5 )
+    local next
+    if data.times[k+1] == nil then 
+        next = data.period
+    else
+        next = data.times[k+1][1]
+    end
+    next = math.floor( next / data.period * width + 0.5 )
+    
+    tex:SetPoint("TOPLEFT",x,0)
+    tex:SetSize( next - x, height )
+    
+    local a = 0.75
+    if v[2] == "g" then
+        tex:SetTexture( 0.1,1,0.15, a )
+    elseif v[2] == "y" then
+        tex:SetTexture( 0.9,0.95,0.05,a )
+    elseif v[2] == "o" then
+        tex:SetTexture( 1,0.6,0.05,a )
+    elseif v[2] == "r" then
+        tex:SetTexture( 1,0.12,0.05,a )
+    end
+    tex:SetBlendMode( "ADD" )
+    
+end
+
+
+

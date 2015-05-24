@@ -1,0 +1,37 @@
+function()
+    
+    local data = wa_bmon_data
+    
+    if not data.active then return false end
+    
+    data.show = data.OnBoat()
+    if data.show then 
+        
+        local haste = 1.0 + (GetHaste()/100.0)
+        local offset = data.flytime + (data.sabotime / haste)
+        
+        local time = GetTime()
+        if data.freeze ~= nil and GetTime() < data.freeze + 5 then
+            time = data.freeze 
+        end
+        
+        local t = time - data.base_time
+        t = t + offset
+        if t > data.period then t = t - data.period end
+        if t > data.period then t = t - data.period end
+        if t > data.period or t < 0 then 
+            data.show = false
+            return false
+        end
+        
+        
+        data.progress = t 
+        
+    end
+    
+    return data.show
+    
+    
+end
+
+

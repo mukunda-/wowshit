@@ -1,0 +1,24 @@
+transition: 2 hunters
+smash 1:
+smash 2: moonkin1
+smash 3: moonkin2
+smash 4: 
+smash 5: 
+smash 6: 
+smash 7: 
+smash 8: 
+
+------------------------
+balcony assignments
+
+         people                 cooldown:
+transition: 2 hunters		
+smash 1: ---
+smash 2: moonkin1 far      	life cocoon
+smash 3: moonkin2 near     	seraphim sac
+smash 4: warlock + serap far 	personals (3-split)
+smash 5: moonkin1 near		healer sac or ironbark
+smash 6: moonkin2 far 		serpahim sac
+smash 7: warlock + serap near 	personals (3-split)
+smash 8: moonkin1		life cocoon
+

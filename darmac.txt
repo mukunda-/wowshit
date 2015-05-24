@@ -1,0 +1,66 @@
+function(e,...)
+    
+    local a = UnitDebuff( "player", "Crush Armor" )
+    if a ~= nil then return false end -- player has debuff
+    
+    local boss = nil
+    if UnitName( "boss1" ) == "Ironcrusher" then -- which boss is the elephant?
+        boss = "boss1"
+    elseif UnitName( "boss2" ) == "Ironcrusher" then
+        boss = "boss2"
+    end
+    
+    if boss == nil then return false end -- not on that boss
+    
+    if UnitGUID( boss .. "target" ) == UnitGUID( "player" ) then 
+        return false  -- boss is targetting the player
+    end
+    
+    -- get stacks on boss' target
+    local debuff,_,_,stacks = UnitDebuff( boss .. "target", "Crush Armor" )
+    
+    if debuff == nil or (stacks or 0) < 2 then 
+        return false -- target doesnt have debuff
+    end
+    
+    return false
+end
+
+
+function(e,...)
+    
+    local a = UnitDebuff( "player", "Seared Flesh" )
+    if a ~= nil then return false end -- player has debuff
+    
+    local boss = nil
+    if UnitName( "boss1" ) == "Dreadwing" then
+        boss = "boss1"
+    elseif UnitName( "boss2" ) == "Dreadwing" then
+        boss = "boss2"
+    end
+    
+    if boss == nil then return false end -- not on that boss
+    
+    if UnitGUID( boss .. "target" ) == UnitGUID( "player" ) then 
+        return false  -- boss is targetting the player
+    end
+    
+    -- get stacks on boss' target
+    local debuff,_,_,stacks = UnitDebuff( boss .. "target", "Seared Flesh" )
+    
+    if debuff == nil or (stacks or 0) < 5 then 
+        return false -- target doesnt have ENOUGH STACKS
+    end
+    
+    return false
+end
+
+UNIT_AURA,UNIT_TARGET
+
+
+
+
+
+
+
+

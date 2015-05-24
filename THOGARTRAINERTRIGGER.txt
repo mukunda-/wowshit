@@ -1,0 +1,49 @@
+function(e,...) 
+    local data = wa_bt_thogar_trainer
+    
+    if e == "ENCOUNTER_START" then 
+        
+        -- started an encounter
+        
+        local id,_,diff = ... 
+        
+        if id == 1692 and diff == 16 then
+            
+	    data.Start()
+            
+        end
+        
+    elseif e == "ENCOUNTER_END" then
+        local id,_,diff,_,status = ... 
+        
+        if id == 1692 then
+            data.Stop()
+        end
+        
+	if id == 1692 and diff == 16 and status == 1 then
+	    print( "good job, thogar is kill. thanks 4 using thogar trainer v1.0.9000" ) 
+	end
+        
+    end
+    
+    return data.active
+    
+end
+
+---------
+
+function(e,...) 
+    local data = wa_bt_thogar_trainer
+    
+    local active = UnitBuff( "player", "Legacy of the White Tiger" )
+    
+    if active then 
+	data.Start() 
+    else 
+	data.Stop() 
+    end
+    
+    return data.active
+    
+end
+ 

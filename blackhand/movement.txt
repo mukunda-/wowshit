@@ -1,0 +1,37 @@
+demolition movement
+
+--- #1 ---
+
+wait for second swirl
+stampede to right
+wait for fourth swirl
+fox to left
+
+--- #2 ---
+ 
+wait for second swirl
+stampede to right
+wait for fourth swirl, marks wait for impale and use teleporter
+(the 3rd swirl hits AFTER the marks)
+fox to left, personal speed cds
+
+--- #3 --- 
+
+wait for second swirl
+stampede to right
+wait for fourth swirl
+teleport to left, marks too
+(the 3rd swirl hits BEFORE the marks)
+
+--- #4 ---
+
+wipe
+
+-----------
+
+NOTES:
+
+melee stay on north side
+use stampedes early, movement timing is critical (3 seconds to move across)
+
+demo swirls spawn every 3 seconds, and each deal damage after 6 seconds

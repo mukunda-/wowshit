@@ -1,0 +1,33 @@
+function( e, ... )
+    local data = wa_bh_smash_data
+    if e == "ENCOUNTER_START" then
+        local a = ...
+        if a ~= nil then
+            data.phase = 1
+            data.count = 1
+            data.warned = false
+        end
+        
+    elseif e == "UNIT_SPELLCAST_SUCCEEDED" then
+        local unit,_,_,_,spellID = ...
+        
+        if unit == "boss1" then
+            if spellID == 161347 then
+                data.phase = 2
+                data.count = 1
+                WeakAuras.ScanEvents( "WA_BH_SMASHED", data.phase, 0 )
+            elseif spellID == 161348 then
+                data.phase = 3
+                data.count = 1
+                WeakAuras.ScanEvents( "WA_BH_SMASHED", data.phase, 0 )
+            elseif spellID == 155992 or spellID == 159142 or spellID == 158054 then
+                WeakAuras.ScanEvents( "WA_BH_SMASHED", data.phase, data.count )
+                data.count = data.count + 1
+            end
+        end
+        
+        
+    end
+    return false
+end
+

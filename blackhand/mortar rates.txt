@@ -1,0 +1,8 @@
+0 stacks: 40 seconds
+
+0 stacks 30 seconds (30)
+1 stack  20 seconds		18.1
+2 stacks 10  seconds		9.9
+3 stacks 5 seconds		5.9
+4 stacls 2.5 seconds		3
+5 stacks 1.5  seconds		1.5 (cap)

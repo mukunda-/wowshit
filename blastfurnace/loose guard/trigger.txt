@@ -1,0 +1,24 @@
+function( e, ... )
+    local _,evt,_,sourceGUID,sourceName,_,_,destGUID,destName = ...
+    
+    if evt == "SWING_DAMAGE" and sourceName == "Security Guard" then
+        
+        local unit = nil
+        for i = 1, 40 do
+            if UnitGUID( "raid" .. i ) == destGUID then
+                unit = "raid" .. i
+                break
+            end
+            
+        end
+        if unit == nil then return false end
+        
+        local role = UnitGroupRolesAssigned( unit )
+        if role == "DAMAGER" or role == "HEALER" then
+		
+		
+	end
+    end
+    
+    return false
+end

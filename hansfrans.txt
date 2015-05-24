@@ -1,0 +1,89 @@
+wa_bt_stampers = {
+    active = false,
+    plates = {}, 
+    mytimer_start = nil,
+    mytimer_expires = nil,
+    movetime = 6.5    -- seconds to stay on each plate
+}
+
+-------------------------------------------------------------------------------
+wa_bt_stampers.GetPlate = function( player )
+    -- returns the plate index a player is touching
+    -- returns nil if the player is invalid or dead
+    
+    local y,x = UnitPosition( player )
+    if x == nil then return nil end -- not in raid
+    if UnitIsDeadOrGhost( player ) then return nil end -- not alive
+    
+    x = floor( (3528.93 - x) / 14.4366 )
+    y = floor( (172.99 - y) / 19.8 )
+    
+    local plate = x + y * 5
+    if plate < 0 or plate > 19 then return nil end
+    return plate
+end
+
+-------------------------------------------------------------------------------
+wa_bt_stampers.Start = function() 
+    local data = wa_bt_stampers
+    if data.active then return end
+    
+    for i = 0, 19 do
+        data.plates[i] = nil
+    end    
+    data.active = true
+end
+
+-------------------------------------------------------------------------------
+wa_bt_stampers.Stop = function() 
+    local data = wa_bt_stampers 
+    if not data.active then return end
+    
+    data.active = false
+    data.mytimer = nil
+end
+
+-------------------------------------------------------------------------------
+wa_bt_stampers.OnFrame = function()
+    local data = wa_bt_stampers
+    if data == nil then return end
+    if not data.active then return end
+    
+    for i = 1, 20 do
+        local plate = data.GetPlate( "raid" .. i )
+        if plate ~= nil then 
+            if data.plates[plate] == nil then
+                data.plates[plate] = GetTime()
+                
+            end
+        end
+    end
+    
+    local myplate = data.GetPlate( "player" )
+    if myplate == nil or data.plates[myplate] == nil then
+        data.mytimer_start = nil
+        data.mytimer_expires = nil
+    else
+        data.mytimer_start = data.plates[myplate]
+        
+        data.mytimer_expires = data.mytimer_start + data.movetime
+        
+    end
+    
+end
+
+-------------------------------------------------------------------------------
+wa_bt_stampers.MyTime = function()
+    
+    local data = wa_bt_stampers
+    if data == nil or data.mytimer_start == nil 
+    or not data.active then 
+        return nil 
+    end
+    
+    local t = data.movetime
+    t = t -(GetTime() - data.mytimer_start)
+    if t < 0 then t = 0 end
+    return  t
+end
+

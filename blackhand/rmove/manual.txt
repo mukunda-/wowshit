@@ -1,0 +1,15 @@
+Red means stop, green means go. Don't wait for green confirmation, move as soon as red is full.
+
+Blue means you are marked and must wait until the mark expires and then click the portal.
+Click the portal as soon as the blue fills and turns to green. In this case you want to actually wait to see green to not accidentally move the mark out in the open.
+
+Orange means you are marked and have the portal debuff, in which case you need to wait.
+Orange will make you yell "help." so healers are aware of your situation.
+Orange will say "WAIT AND SURVIVE" or "WAIT AND SURVIVE/BLINK", the latter meaning that
+there will be ample time to escape afterwards if you blink.
+
+Orange may also switch it's text to "BLINK OR SURVIVE" when the last demo swirl goes out if you have 2 or more seconds remaining to blink to the other side. Do not move if you can't blink.
+
+If you get marked and there is ample time and you do not have the teleporter debuff, the bar will tell you to "PREPARE TO TELEPORT" with red, and "TELEPORT MARK!!" with green.
+
+Flashing gray means you have gone outside of the inner circle with the chance spawning a bad swirl.

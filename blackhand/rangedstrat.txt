@@ -1,0 +1,42 @@
+There are 3 demolitions in phase 1. If you get a 4th demolition, you will be out of time. Marks start to go out after the 1st demolition (after debris piles are formed). Marks will go out BEFORE and DURING the 2nd and 3rd demolitions.
+
+The movement for ranged for demolition is normally:
+
+1) Bait the debris locations on the left side
+
+2) Use stampeding roar and move to the right side
+
+3) Bait the debris locations on the right side
+
+4) Use fox and move to the left side
+
+For the last demolition, there won't be any fox available, and you should use the teleporter if you can.
+
+This changes for players who get marked during the demolition, the marks will always go out when you are moving to the right side.
+
+If you get marked during the 2ND demolition, you need to wait at the right side until the marks expire, and then immediately click the teleporter to escape the debris falling. You can NOT wait for your cast to finish, and you can not click the teleporter early, because there is less than 1 second remaining after baiting the debris piles that the mark will expire and impale llanna.
+
+If you get marked during the 3RD demolition, you should use the teleporter normally to move the mark to the left side. If in the event that you have the teleporter debuff (from having a mark on the 2ND demolition), if you have an alternative ability that can move you quickly, you should use that to get to the left side (blink,transcendence,etc). You CANNOT move to the left side unless you have a fast teleporting/leaping ability, otherwise you won't make it in time and you will impale llanna.. If you are stuck at the right side in this situation, you need to use a personal immunity or defensive ability, or call for one to be cast on you, and then move over after the marks expire.
+
+ADDITIONAL NOTES
+
+The weakaura that tells you to move tells you 1/10 of a second early to compensate for latency, and it assumes you will be running. If you are going to blink or teleport, wait a moment before doing so because you might still be in that "early window" and drag a debris swirl with you.
+
+In the situation you have to wait with mark during the 3rd demolition, make sure you are right against the debris pile to make sure the debris falling knockback doesn't throw you into the open.
+
+THE TIMINGS ARE NOT FORGIVING. YOU MUST MOVE WHEN TOLD AND NOT 0.2 SECONDS BEFORE OR AFTER. CANCEL YOUR CAST OR YOU WILL DIE OR KILL SOMEONE ELSE.
+
+-------------------
+
+balcony assignments
+
+         people                 cooldown:
+drop   : 2 hunters		
+smash 1: ---
+smash 2: moonkin1 far      	life cocoon
+smash 3: moonkin2 near     	seraphim sac
+smash 4: warlock + pride far 	personals (3-split)
+smash 5: moonkin1 near		healer sac or ironbark
+smash 6: moonkin2 far 		serpahim sac
+smash 7: warlock + pride near 	personals (3-split)
+smash 8: moonkin1 far		life cocoon

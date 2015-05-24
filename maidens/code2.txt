@@ -1,0 +1,51 @@
+
+
+function(e,...)
+    
+    local data = wa_bmon_data
+    
+    if e == "ENCOUNTER_START" then
+        
+    elseif e == "ENCOUNTER_END" then
+        local a = ...
+        if a == nil then return false end
+        
+        data.active = false
+       
+    elseif e == "COMBAT_LOG_EVENT_UNFILTERED" then
+    
+	local _,evt,_,_,_,_,_,_,_,_,_,spellID = ...
+	if spellID == 157854 and evt == "SPELL_CAST_SUCCESS" then
+        -- if spellID == 116781 then -- (DEBUG MODE)
+	 
+            -- alpha
+            data.active = true
+            data.base_time = GetTime() - 17.2 
+            
+	elseif spellID == 157886 and evt == "SPELL_CAST_SUCCESS" then
+                    
+            -- omega
+            data.active = true 
+            data.base_time = GetTime() - 2.85 
+            
+        end
+        
+    elseif e == "UNIT_SPELLCAST_START" then
+        local unit,_,_,_,spellID = ...
+        if spellID == 158148 and unit == "player" then
+            -- if spellID ==116694 and unit == "player" then -- (DEBUG MODE)
+            data.freeze = GetTime()
+            
+        end
+    elseif e == "UNIT_SPELLCAST_INTERRUPTED" then
+        if spellID == 158148 and unit == "player" then
+            
+            -- if spellID == 116694 and unit == "player" then -- (DEBUG MODE)
+            data.freeze = nil
+            
+        end        
+    end
+    
+    return false
+end
+

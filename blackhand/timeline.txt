@@ -1,0 +1,57 @@
+PHASE1 TIMELINE
+
+ 6.1		mines 1
+
+15.9		demo 1			melee is on the outside 
+15.9		demo swirl 1		and should save their cds
+18.9		demo swirl 2		
+21.9		demo damage 1
+21.9		demo swirl 3
+24.9		demo damage 2
+24.9		demo swirl 4
+27.9		demo damage 3
+30.9		demo damage 4
+
+32.167		mines 2
+
+35.767		marks 1
+41.1		marks 1 hit
+
+46.7		demo 2
+46.7		demo swirl 1	(visible at 47.1)
+49.7	+3	demo swirl 2	(visible 49.8)
+51.767		marks 2
+52.7	+6	demo damage 1
+52.7	+6	demo swirl 3	(visible 52.9)
+55.7	+9	demo damage 2
+55.7	+9	demo swirl 4	(visible 56.2)
+56.9		marks 2 hit	<-- danger
+57.8		mines 3
+58.7	+12	demo damage 3
+61.7	+15	demo damage 4
+
+67.76		marks 3
+72.9		marks 3 hit
+
+77.4		demo 3
+77.4		demo swirl 1
+80.4		demo swirl 2
+83.4		demo damage 1
+83.4		demo swirl 3
+83.6		mines 4
+84.7		marks 4
+86.4		demo damage 2
+86.4		demo swirl 4
+89.4		demo damage 3
+90.1		marks 4 hit	<-- danger
+92.4		demo damage 4
+
+100.3		marks 5
+105.1		marks 5 hit
+
+107 seconds to finish phase1
+
+exploding iron star deals 200k fire damage, make sure everyone has above 200k health
+or 160k + devo aura
+
+BANDAGE BEFORE IRON STAR HITS
