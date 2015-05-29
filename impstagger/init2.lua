@@ -1,4 +1,4 @@
-wa_improved_stagger_data = aura_env
+wa_improved_stagger_data2 = aura_env
 
 aura_env.stagger  = 0 -- current stagger value
 aura_env.stagger1 = 0 -- current stagger value / health
@@ -12,6 +12,7 @@ aura_env.stime    = 0
 
 -------------------------------------------------------------------------------
 function aura_env.OnCombat( ... ) 
+--[[
 	local _,evt,_,_,_,_,_,destGUID,_,_,_,thing,_,_,spell1,spell2,spell3,spell4,spell5,spell6 = ...
 	
 	local guid = UnitGUID( "player" ) 
@@ -48,11 +49,13 @@ function aura_env.OnCombat( ... )
 			
 		end
 	end
+	]]
 end
 
 -------------------------------------------------------------------------------
 function aura_env.Purified()
-	aura_env.stagger = 0
+
+--	aura_env.stagger = 0
 	aura_env.purified = GetTime()
 end
 
@@ -87,10 +90,17 @@ end
 
 -------------------------------------------------------------------------------
 function aura_env.Refresh()
-	if GetTime() >= aura_env.stime + 5 and UnitStagger( "player" ) == 0 then
+	local name = UnitDebuff( "player", "Light Stagger" ) or
+	          UnitDebuff( "player", "Moderate Stagger" ) or
+			  UnitDebuff( "player", "Heavy Stagger" )
+			  
+	if name == nil then
 		aura_env.stagger = 0
+	else
+		local v1,v2,v3 = select( 14, UnitDebuff( "player", name ))
+		aura_env.stagger = v3
 	end
-	
+	 
 	if aura_env.stagger < aura_env.smooth then
 		aura_env.smooth = aura_env.smooth * 0.9 + aura_env.stagger * 0.1
 	else
@@ -105,14 +115,15 @@ function aura_env.Refresh()
 	aura_env.smooth1 = math.max( aura_env.smooth1, 0 )
 	aura_env.smooth1 = math.min( aura_env.smooth1, 1 )
 	
-	if aura_env.stagger1 >= 0.7 then
+	if name == "Heavy Stagger" then
 		aura_env.stage = 3
-	elseif aura_env.stagger1 >= 0.3 then
+	elseif name == "Moderate Stagger" then
 		aura_env.stage = 2
 	else
 		aura_env.stage = 1
 	end
 	
+	-- always show bar in combat, and show if they are staggering damage
 	return UnitAffectingCombat("player") or aura_env.stagger > 5000
 end
 

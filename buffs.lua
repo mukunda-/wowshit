@@ -151,7 +151,7 @@ function aura_env.Check( unit )
 	
 	x, y = x - px, y - py
 	local d = x^2 + y^2
-	if d > 100*100 then return end -- out of range.
+	if d > 40*40 then return end -- out of range.
 	
 	for _,index in pairs( aura_env.spell_list[aura_env.spell] ) do
 		local satisfied = false
