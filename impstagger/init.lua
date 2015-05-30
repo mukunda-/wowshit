@@ -44,7 +44,7 @@ function aura_env.OnCombat( ... )
 		end
 	elseif evt == "SPELL_PERIODIC_MISSED" then
 		if thing == 124255 then
-			aura_env.stagger = aura_env.stagger - spell4
+			aura_env.stagger = aura_env.stagger - (spell4 or 0)
 			
 		end
 	end

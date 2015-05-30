@@ -4,22 +4,18 @@ local data = wa_bh_smashhelper_data
 -------------------------------------------------------------------------------
 -- CONFIGURATION
 -------------------------------------------------------------------------------
-
-data.name  = "Blackhand - Smash Helper" -- must match aura name.
-
+ 
 -- order of people being sent up.
 data.order = {
-	
-	[2] = {{"Kota",         "far" }},
-	[3] = {{"Kairipta",     "near"}},
-	[4] = {{"Scheherazade", "far" }, 
-	       {"Pride",        "far" }},
-	[5] = {{"Kota",         "near"}},
-	[6] = {{"Kairipta",     "far" }},
-	[7] = {{"Scheherazade", "near"},
-	       {"Pride",        "near"}},
-	[8] = {{"Kota",         "far" }},
-	[9] = {{"Kairipta",     "near"}}
+	[1] = {{"Daxsik",         "near" }},
+	[2] = {{"Daxsik",         "far" }},
+	[3] = {{"Daxsik",     "near"}},
+	[4] = {{"Daxsik", "far" }, {"Pride", "far" }},
+	[5] = {{"Daxsik",         "near"}},
+	[6] = {{"Daxsik",     "far" }},
+	[7] = {{"Daxsik", "near"}, {"Pride", "near"}},
+	[8] = {{"Daxsik",         "far" }},
+	[9] = {{"Daxsik",     "near"}}
 }
 
 data.target_locations = {
@@ -27,6 +23,8 @@ data.target_locations = {
 	near = { 530.2,   3448.0 },
 	far  = { 533.9,   3538.2 }
 }
+
+data.offset = 3.5
 
 data.scale = 0.1
 
@@ -42,7 +40,7 @@ data.show = false
 
 local function Setup()
 
-	local region = WeakAuras.regions[data.name].region
+	local region = WeakAuras.regions[aura_env.id].region
 
 	-- setup frames
 
@@ -141,7 +139,7 @@ function data.Refresh()
 	local d = math.sqrt( vec_x^2 + vec_y^2 )
 	if d < 1 then return false end -- they are UNDER the target...
 	
-	vec_x, vec_y = tank_x + (vec_x / d) * 1.9, tank_y + (vec_y / d) * 1.9
+	vec_x, vec_y = tank_x + (vec_x / d) * data.offset, tank_y + (vec_y / d) * data.offset
 	
 	-- vec is where they should stand, 1.9 yards away from the tank
 	-- in the angle towards their target.
@@ -166,7 +164,7 @@ function data.Refresh()
 	
     y = -y
     
-	local region = WeakAuras.regions[data.name].region
+	local region = WeakAuras.regions[aura_env.id].region
 	local width  = region:GetWidth()
 	local height = region:GetHeight()
 	
