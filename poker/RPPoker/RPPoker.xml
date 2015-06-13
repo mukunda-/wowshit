@@ -1,0 +1,32 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+  <Script file="RPPoker.lua" />
+  <Frame name="RPPoker_Frame" parent="UIParent" toplevel="true" enableMouse="true" movable="true">
+    <Scripts>
+	  
+      <OnDragStart>self:StartMoving();</OnDragStart>
+      <OnDragStop>self:StopMovingOrSizing();</OnDragStop>
+	</Scripts>
+    <Size>
+	  <AbsDimension x="200" y="200" />
+	</Size>
+	<Anchors>
+	  <Anchor point="CENTER" />
+	</Anchors>
+	
+	<Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background"
+           edgeFile="Interface\DialogFrame\UI-DialogBox-Border" tile="true">
+       <BackgroundInsets>
+         <AbsInset left="11" right="12" top="12" bottom="11"/>
+       </BackgroundInsets>
+       <TileSize>
+         <AbsValue val="32"/>
+       </TileSize>
+       <EdgeSize>
+         <AbsValue val="32"/>
+       </EdgeSize>
+     </Backdrop>
+  
+  </Frame>
+</Ui>
