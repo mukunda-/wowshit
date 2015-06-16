@@ -17,6 +17,7 @@ local g_multiplier  = 1.0
 local g_deck = {}
 
 
+local STATE_SETUP = 1 -- adding players
 local STATE_LIVE  = 2 -- playing a game
 
 local g_betting_round
