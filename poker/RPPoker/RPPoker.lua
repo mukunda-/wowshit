@@ -94,7 +94,6 @@ end
 local function StartGame()
 	g_dealer = 1
 	NewDeck()
-	
 end
 
 -------------------------------------------------------------------------------
@@ -117,6 +116,7 @@ end
 local function DealHand()
 	
 	-- emote: deals a new hand. <a> and <b> place the blinds (1000g)
+	
 	SendChatMessage( "deals a new hand.", "EMOTE" )
 	
 	for k,v in pairs( g_players ) do
