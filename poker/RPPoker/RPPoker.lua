@@ -42,6 +42,9 @@ local g_turned  -- has the turn been dealt
 local g_pot = 0 -- amount of credit in the pot
 local g_bet = 0 -- current bet
 
+local g_raises  -- number of times the bet was raised in the round
+local g_max_raises = 3
+
 -- game state
 local g_state = STATE_SETUP
 
@@ -79,8 +82,12 @@ end
 --
 -- Errors if they already have 2 cards.
 --
-local function DealCard()
-	local p = CurrentPlayer()
+-- @param player Player to give the card to. Defaults to CurrentPlayer()
+-- @returns true if a card was given, false if the player is folded.
+--
+local function DealCard( player )
+
+	local p = player or CurrentPlayer()
 	
 	if p.folded then return false end -- (player is taking a break.)
 	
@@ -190,13 +197,17 @@ end
 -- bets as much as they have.
 --
 local function AddBet( player, amount )
+	g_bet = g_bet + amount
+	
+	-- player goes all in if they cant afford the bet
+	-- take care to not allow players to bet higher than they own
+	-- the clipping is only for antes and blinds
 	if player.credit < amount then
 		amount = player.credit
 		player.allin = true
 	end
 	
 	g_pot = g_pot + amount
-	g_bet = g_bet + amount
 	player.bet = player.bet + amount
 	player.credit = player.credit - amount
 	
@@ -205,13 +216,32 @@ local function AddBet( player, amount )
 end
 
 -------------------------------------------------------------------------------
+-- Deal cards.
+--
+local function PlayerDealCards() 
+	assert( g_turn == g_dealer )
+	
+	local x = g_dealer
+	
+	for i = 1,#g_players*2 do
+		x = x + 1
+		if x >= #g_players then x = 1 end
+		
+		if not g_players[x].folded then
+			DealCard( g_players[x] )
+		end
+	end
+end
+
+-------------------------------------------------------------------------------
 -- Ante up for all players.
 --
 local function PlayerAnteUp()
 	for _,p in pairs(g_players) do
 	
-		AddBet( p, g_ante )
-		
+		if not p.folded then
+			AddBet( p, g_ante )
+		end
 	end
 end
 
@@ -273,6 +303,7 @@ local function DealHand()
 	SendChatMessage( "deals a new hand.", "EMOTE" )
 	
 	g_betting_round = 1
+	g_raises = 0
 	
 	for k,v in pairs( g_players ) do
 		v.folded = false
@@ -292,16 +323,13 @@ local function DealHand()
 	if g_dealer >= #g_players then g_dealer = 1 end
 	
 	SetTurn( g_dealer )
-	
-	NextTurn()
-	for i = 1, #g_players*2 do
-		DealCard()
-		NextTurn()
-	end
+	PlayerDealCards()
 	
 	for k,v in pairs( g_players ) do
 		TellCards( v )
 	end
+	
+	NextTurn()
 	
 	-- put up the blinds
 	BetSmallBlind()
@@ -309,4 +337,5 @@ local function DealHand()
 	BetBigBlind()
 	NextTurn()
 	AnnounceTurn()
+	
 end
