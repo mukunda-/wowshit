@@ -49,15 +49,17 @@ local g_max_raises = 3
 local g_state = STATE_SETUP
 
 -------------------------------------------------------------------------------
--- Shuffles a new deck.
+-- Loads a new shuffled deck.
 --
 local function NewDeck()
 	g_deck = {}
 	
+	-- insert 52 cards.
 	for i = 1,52 do
 		table.insert( g_deck, i )
 	end
 	
+	-- shuffle
 	for i = 52,2,-1 do
 		local j = math.random( 1, i )
 		local k = g_deck[i]
@@ -68,6 +70,11 @@ end
 
 -------------------------------------------------------------------------------
 -- Draws a card from the deck.
+--
+-- If there is no deck or the previous deck has run out of cards, this
+-- also calls NewDeck.
+--
+-- @returns card index.
 --
 local function DrawCard()
 	if g_deck[1] == nil then NewDeck() end
@@ -332,9 +339,9 @@ local function DealHand()
 	NextTurn()
 	
 	-- put up the blinds
-	BetSmallBlind()
+	PlayerBetSmallBlind()
 	NextTurn()	
-	BetBigBlind()
+	PlayerBetBigBlind()
 	NextTurn()
 	AnnounceTurn()
 	
