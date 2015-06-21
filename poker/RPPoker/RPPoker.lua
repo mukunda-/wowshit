@@ -6,6 +6,7 @@ local g_players = {}
 --   credit  money remaining
 --   hand    two cards (hole)
 --   bet     how much money they bet in the current hand
+--   pot     how much they have in the pot
 --   acted   they have acted during the current betting round
 --   allin   if they are all in for the hand
 --   folded  if they are folded for the rest of the hand
@@ -26,20 +27,21 @@ local g_deck = {}
 local STATE_SETUP = 1 -- adding players
 local STATE_LIVE  = 2 -- playing a game
 
-local g_stage
+local g_round
+local g_round_complete
 
-local STAGE_PREFLOP   = 1
-local STAGE_POSTFLOP  = 2
-local STAGE_POSTTURN  = 3
-local STAGE_POSTRIVER = 4
-local STAGE_SHOWDOWN  = 5
+local ROUND_PREFLOP   = 1
+local ROUND_POSTFLOP  = 2
+local ROUND_POSTTURN  = 3
+local ROUND_POSTRIVER = 4
+local ROUND_SHOWDOWN  = 5
 
 local g_turn -- whose turn is it
 
 local g_flopped -- has the flop been dealt
 local g_turned  -- has the turn been dealt
 
-local g_pot = 0 -- amount of credit in the pot
+local g_pot = 0 -- total amount of credit in the pot (and side pots)
 local g_bet = 0 -- current bet
 
 local g_raises  -- number of times the bet was raised in the round
@@ -113,6 +115,7 @@ local function CreatePlayer( name, credit )
 		allin  = false;
 		acted  = true;
 		bet    = 0;
+		pot    = 0;
 		active = true;
 	}
 end
@@ -125,7 +128,7 @@ local function CurrentPlayer()
 end
 
 -------------------------------------------------------------------------------
--- Increment the turn to the next non-folded player.
+-- Increment the turn to the next player that isn't folded.
 --
 local function NextTurn()
 	local t = g_turn
@@ -204,18 +207,22 @@ end
 -- bets as much as they have.
 --
 local function AddBet( player, amount )
-	g_bet = g_bet + amount
 	
 	-- player goes all in if they cant afford the bet
 	-- take care to not allow players to bet higher than they own
 	-- the clipping is only for antes and blinds
+	
 	if player.credit < amount then
 		amount = player.credit
 		player.allin = true
 	end
 	
 	g_pot = g_pot + amount
+	
 	player.bet = player.bet + amount
+	g_bet = math.max( g_bet, player.bet )
+	
+	player.pot = player.pot + amount
 	player.credit = player.credit - amount
 	
 	if player.credit == 0 then player.allin = true end
@@ -284,6 +291,10 @@ end
 local function AnnounceTurn()
 	local p = CurrentPlayer()
 	
+	local actions = ""
+	
+	
+	
 	local text = string.format( "%s's turn. Actions: 
 end
 
@@ -301,33 +312,230 @@ local function PartyPrint( text )
 end
 
 -------------------------------------------------------------------------------
+-- Returns the amount of players that aren't folded.
+--
+local function ActivePlayers() 
+	local count = 0
+	for k,v in pairs(g_players) do
+		if not v.folded then count = count + 1 end
+	end
+	return count
+end
+
+-------------------------------------------------------------------------------
+local function CallAmount( player )
+	return g_bet - player.bet
+end
+
+-------------------------------------------------------------------------------
+-- Reset the "acted" state for each player, do this after the 
+-- bet is raised.
+--
+local function ResetActed()
+	for k,v in pairs(g_players) do
+		
+		if not v.folded and not v.allin then
+			v.acted = false
+		end
+	end
+end
+
+-------------------------------------------------------------------------------
+-- Player action: Call
+--
+local function PlayerCall()
+	local p = CurrentPlayer()
+	
+	if p.credit < CallAmount(p) then
+		print( "Insufficient credit." )
+		return
+	end
+	
+	p.acted = true
+	AddBet( p, g_bet - p.bet )
+	
+	ContinueBettingRound()
+end
+
+-------------------------------------------------------------------------------
+-- Player action: Check
+--
+local function PlayerCheck()
+	local p = CurrentPlayer()
+	
+	if CallAmount(p) != 0 then
+		print( "Check not allowed." )
+		return
+	end
+	
+	p.acted = true
+	
+	ContinueBettingRound()
+end
+
+-------------------------------------------------------------------------------
+-- Player action: Bet
+--
+-- @param amount Amount to add to the bet, minimum is the big blind.
+--
+local function PlayerBet( amount )
+	local p = CurrentPlayer()
+	
+	if CallAmount(p) != 0 then
+		print( "Player must raise, not bet." )
+		return
+	end
+	
+	if amount < g_big_blind then
+		print( "Must bet at least the big blind amount." )
+		return
+	end
+	
+	ResetActed()
+	p.acted = true
+	AddBet( amount )
+	
+	ContinueBettingRound()
+end
+
+-------------------------------------------------------------------------------
+-- Player action: Call and raise
+--
+-- @param amount Amount to add to the bet, minimum is the big blind.
+--
+local function PlayerRaise( amount )
+	local p = CurrentPlayer()
+	
+	if g_raises >= g_max_raises then
+		print( "Cannot raise higher." )
+		return
+	end
+	
+	if amount < g_big_blind then 
+		print( "Must raise at least the big blind amount." )
+		return
+	end
+	
+	amount = amount + CallAmount(p)
+	if amount > p.credit then
+		print( "Insufficient credit." )
+		return
+	end
+	
+	ResetActed()
+	p.acted = true
+	AddBet( p, amount )
+	
+	ContinueBettingRound()
+end
+
+-------------------------------------------------------------------------------
+-- Returns the next non-folded player from the index.
+--
+local function FindNextPlayer( index )
+	
+	for i = 1,#g_players do
+		index = index + 1
+		if index >= #g_players then index = 1 end
+		if not g_players[index].folded then
+			break
+		end
+	end
+	
+	return index
+end
+
+-------------------------------------------------------------------------------
+local function AllPlayersActed()
+	for i = 1, #g_players do
+		if not g_players[i].acted then return false end
+	end
+	
+	return true
+end
+
+-------------------------------------------------------------------------------
+-- Start a betting round
+--
+-- @param reset_pos Reset the turn to the person left of the dealer.
+--
+local function StartBettingRound( reset_pos )
+	g_round_complete = false
+	
+	if reset_pos then
+		local t = FindNextPlayer( g_dealer )
+		SetTurn(t)
+	end
+	
+	ContinueBettingRound()
+end
+
+-------------------------------------------------------------------------------
+local function ContinueBettingRound()
+
+	if AllPlayersActed() then
+		g_round_complete = true
+	end
+	
+	-- find next turn
+	while( true )
+		local p = CurrentPlayer()
+		if p.acted or p.allin then
+			p.acted = true
+			NextTurn()
+		else
+			break
+		end
+	end
+end
+
+-------------------------------------------------------------------------------
+local function EndBettingRound() 
+	if not g_round_complete then
+		print( "The current betting round is not complete." )
+		return
+	end
+	
+	
+end
+
+-------------------------------------------------------------------------------
 -- Start a new hand.
 --
 local function DealHand()
 	
 	-- emote: deals a new hand. <a> and <b> place the blinds (1000g)
 	
-	SendChatMessage( "deals a new hand.", "EMOTE" )
-	
-	g_betting_round = 1
+	g_round  = ROUND_PREFLOP
 	g_raises = 0
+	g_bet    = g_ante + g_big_blind
 	
 	for k,v in pairs( g_players ) do
 		v.folded = false
 		v.hand   = {}
 		v.bet    = 0
+		v.pot    = 0
 		v.acted  = false
 		v.allin  = false
 		
 		if not v.active then
 			-- sit out this hand
 			v.folded = true
+			v.acted  = true 
 		end
 	end
 	
+	if ActivePlayers() < 2 then
+		print( "Not enough players for a new hand." )
+		return
+	end
+	
+	PlayerAnteUp()
+	
+	SendChatMessage( "DEBUG: NEW HAND", "PARTY" )
+	
 	-- pass the button
-	g_dealer = g_dealer + 1
-	if g_dealer >= #g_players then g_dealer = 1 end
+	g_dealer = FindNextPlayer( g_dealer )
 	
 	SetTurn( g_dealer )
 	PlayerDealCards()
@@ -340,9 +548,10 @@ local function DealHand()
 	
 	-- put up the blinds
 	PlayerBetSmallBlind()
-	NextTurn()	
+	NextTurn()
 	PlayerBetBigBlind()
 	NextTurn()
-	AnnounceTurn()
+	
+	StartBettingRound( false )
 	
 end
