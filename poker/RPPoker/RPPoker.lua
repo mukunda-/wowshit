@@ -1,3 +1,4 @@
+-- ♣ ♥ ♠ ♦
 
 local g_players = {}
 
@@ -5,8 +6,8 @@ local g_players = {}
 --   name    player name
 --   credit  money remaining
 --   hand    two cards (hole)
+--   rank    the rank of their hand, filled in at the showdown.
 --   bet     how much money they bet in the current hand
---   pot     how much they have in the pot
 --   acted   they have acted during the current betting round
 --   allin   if they are all in for the hand
 --   folded  if they are folded for the rest of the hand
@@ -28,7 +29,8 @@ local STATE_SETUP = 1 -- adding players
 local STATE_LIVE  = 2 -- playing a game
 
 local g_round
-local g_round_complete
+local g_round_complete  
+local g_hand_complete   = true
 
 local ROUND_PREFLOP   = 1
 local ROUND_POSTFLOP  = 2
@@ -47,8 +49,13 @@ local g_bet = 0 -- current bet
 local g_raises  -- number of times the bet was raised in the round
 local g_max_raises = 3
 
+local g_table = {} -- community cards
+
 -- game state
 local g_state = STATE_SETUP
+
+local CARD_NAMES = { "Ace", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Jack", "Queen", "King" }
+local CARD_SUITS = { "Clubs", "Diamonds", "Hearts", "Spades" }
 
 -------------------------------------------------------------------------------
 -- Loads a new shuffled deck.
@@ -186,6 +193,18 @@ local function ResetGame()
 end
 
 -------------------------------------------------------------------------------
+
+local function CardName( card )
+	card = card - 1
+	local number = math.floor(card / 4)
+	local suit   = card - number*4
+	number = number + 1
+	suit   = suit + 1
+	
+	return CARD_NAMES[number] .. " of " .. CARD_SUITS[suit]
+end
+
+-------------------------------------------------------------------------------
 -- Tell a player what cards they have
 --
 -- @param player Player data.
@@ -215,6 +234,7 @@ local function AddBet( player, amount )
 	if player.credit < amount then
 		amount = player.credit
 		player.allin = true
+		player.acted = true
 	end
 	
 	g_pot = g_pot + amount
@@ -222,10 +242,12 @@ local function AddBet( player, amount )
 	player.bet = player.bet + amount
 	g_bet = math.max( g_bet, player.bet )
 	
-	player.pot = player.pot + amount
 	player.credit = player.credit - amount
 	
-	if player.credit == 0 then player.allin = true end
+	if player.credit == 0 then 
+		player.allin = true
+		player.acted = true
+	end
 	
 end
 
@@ -274,17 +296,6 @@ local function PlayerBetBigBlind()
 	
 	local p = CurrentPlayer()
 	AddBet( CurrentPlayer(), g_big_blind )
-end
-
--------------------------------------------------------------------------------
--- Player folds.
---
-local function PlayerFold()
-	local p = CurrentPlayer()
-	assert( not p.folded )
-	
-	p.folded = true
-	
 end
 
 -------------------------------------------------------------------------------
@@ -430,6 +441,39 @@ local function PlayerRaise( amount )
 end
 
 -------------------------------------------------------------------------------
+-- Player action: Fold
+--
+local function PlayerFold()
+	local p = CurrentPlayer()
+	assert( not p.folded )
+	
+	p.folded = true
+	ContinueBettingRound()
+end
+
+-------------------------------------------------------------------------------
+-- Player action: All-in
+--
+local function PlayerAllIn()
+	local p = CurrentPlayer()
+	assert( not p.folded )
+	
+	if p.credit > CallAmount(p) then
+		local raise = p.credit = CallAmount(p)
+		
+		-- full raise rule
+		if raise > g_big_blind then
+			ResetActed()
+		end
+	end
+	
+	AddBet( p, p.credit )
+	p.acted = true
+	
+	ContinueBettingRound()
+end
+
+-------------------------------------------------------------------------------
 -- Returns the next non-folded player from the index.
 --
 local function FindNextPlayer( index )
@@ -473,29 +517,59 @@ end
 -------------------------------------------------------------------------------
 local function ContinueBettingRound()
 
-	if AllPlayersActed() then
-		g_round_complete = true
+	if ActivePlayers() == 1 then
+		-- everyone else folded.
+		EndHand()
+		return
 	end
 	
+	CheckPots()
+	
 	-- find next turn
-	while( true )
+	while( not AllPlayersActed() )
 		local p = CurrentPlayer()
-		if p.acted or p.allin then
-			p.acted = true
+		if p.acted then
 			NextTurn()
 		else
 			break
 		end
 	end
+	
+	if AllPlayersActed() then
+		g_round_complete = true
+	end
 end
 
 -------------------------------------------------------------------------------
-local function EndBettingRound() 
+local function NextRound() 
 	if not g_round_complete then
-		print( "The current betting round is not complete." )
+		print( "The current round is not complete." )
 		return
 	end
+end
+
+-------------------------------------------------------------------------------
+local function EndHand()
+	assert( not g_hand_complete )
 	
+	g_hand_complete = true
+	
+	CheckPots()
+	
+	if ActivePlayers() == 1 then
+		--
+	end
+end
+
+-------------------------------------------------------------------------------
+-- Distribute pots to winning players
+--
+local function CheckPots()
+	
+end
+
+-------------------------------------------------------------------------------
+local function SortWinners()
 	
 end
 
@@ -505,20 +579,23 @@ end
 local function DealHand()
 	
 	-- emote: deals a new hand. <a> and <b> place the blinds (1000g)
-	
+
+	g_hand_complete = false
 	g_round  = ROUND_PREFLOP
 	g_raises = 0
 	g_bet    = g_ante + g_big_blind
+	g_table  = {}
+	
+	NewDeck()
 	
 	for k,v in pairs( g_players ) do
 		v.folded = false
 		v.hand   = {}
 		v.bet    = 0
-		v.pot    = 0
 		v.acted  = false
 		v.allin  = false
 		
-		if not v.active then
+		if not v.active or v.credit == 0 then
 			-- sit out this hand
 			v.folded = true
 			v.acted  = true 
@@ -554,4 +631,25 @@ local function DealHand()
 	
 	StartBettingRound( false )
 	
+end
+
+-------------------------------------------------------------------------------
+local function ComputeRank( p )
+	local cards = {}
+	
+	for _,v in ipairs( p.hand )
+		table.insert( cards, v )
+	end
+	
+	for _,v in ipairs( g_table )
+		table.insert( cards, v )
+	end
+	
+	local r = ComputeRoyalFlush(cards)  or ComputeStraightFlush(cards) or 
+			  ComputeFourKind(cards) or ComputeFullHouse(cards) or 
+			  ComputeFlush(cards) or ComputeStraight(cards) or 
+			  ComputeThreeKind(cards) or ComputeTwoPair(cards) or
+			  ComputeOnePair(cards) or ComputeHighCard(cards)
+			  
+	p.rank = r
 end
