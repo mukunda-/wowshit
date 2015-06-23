@@ -193,15 +193,26 @@ local function ResetGame()
 end
 
 -------------------------------------------------------------------------------
-
+-- Returns the name of a card.
+--
 local function CardName( card )
+	
+	local number, suit = CardValue( card )
+	
+	return CARD_NAMES[number] .. " of " .. CARD_SUITS[suit]
+end
+
+-------------------------------------------------------------------------------
+-- Returns the number and suit for a card.
+--
+local function CardValue( card )
 	card = card - 1
 	local number = math.floor(card / 4)
 	local suit   = card - number*4
 	number = number + 1
 	suit   = suit + 1
 	
-	return CARD_NAMES[number] .. " of " .. CARD_SUITS[suit]
+	return number, suit
 end
 
 -------------------------------------------------------------------------------
@@ -634,6 +645,41 @@ local function DealHand()
 end
 
 -------------------------------------------------------------------------------
+local function ComputeRoyalFlush( cards )
+
+	local values = {}
+	for i = 1,4 do
+		values[i] = {}
+	end
+
+	for _,v in #cards do
+		local number, suit = CardValue( cards )
+		
+		if number == 1 then
+			values[suit][1] = true
+		elseif number >= 10 then
+			values[suit][2+number-10] = true
+		end
+	end
+	
+	for suit = 1,4 do
+		if values[suit][1] and values[suit][2] and values[suit][3] 
+		   and values[suit][4] and values[suit][5] then
+		   
+			return 9437184
+		end
+	end
+	
+	return nil
+end
+
+-------------------------------------------------------------------------------
+local function ComputeStraightFlush( cards )
+	
+	
+end
+
+-------------------------------------------------------------------------------
 local function ComputeRank( p )
 	local cards = {}
 	
@@ -645,11 +691,11 @@ local function ComputeRank( p )
 		table.insert( cards, v )
 	end
 	
-	local r = ComputeRoyalFlush(cards)  or ComputeStraightFlush(cards) or 
-			  ComputeFourKind(cards) or ComputeFullHouse(cards) or 
-			  ComputeFlush(cards) or ComputeStraight(cards) or 
-			  ComputeThreeKind(cards) or ComputeTwoPair(cards) or
-			  ComputeOnePair(cards) or ComputeHighCard(cards)
+	local r = ComputeRoyalFlush(cards) or ComputeStraightFlush(cards) or 
+			  ComputeFourKind(cards)   or ComputeFullHouse(cards) or 
+			  ComputeFlush(cards)      or ComputeStraight(cards) or 
+			  ComputeThreeKind(cards)  or ComputeTwoPair(cards) or
+			  ComputeOnePair(cards)    or ComputeHighCard(cards)
 			  
 	p.rank = r
 end

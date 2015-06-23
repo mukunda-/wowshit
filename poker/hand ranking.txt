@@ -1,0 +1,15 @@
+[rank] [1] [2] [3] [4] [5] 
+
+4 bits each
+
+index   rank               [1]              [2]              [3]              [4]              [5]
+9       royal flush        
+8       straight flush     high card
+7       four of a kind     quad value       kicker
+6       full house         triple value     double value
+5       flush              high card
+4       straight           high card
+3       three of a kind    triple value     kicker 1         kicker 2
+2       two pair           higher double    lower double     kicker
+1       one pair           double value     kicker 1         kicker 2          kicker 3
+0       high card          kicker 1         kicker 2         kicker 3          kicker 4        kicker 5
