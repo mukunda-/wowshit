@@ -13,3 +13,7 @@ index   rank               [1]              [2]              [3]              [4
 2       two pair           higher double    lower double     kicker
 1       one pair           double value     kicker 1         kicker 2          kicker 3
 0       high card          kicker 1         kicker 2         kicker 3          kicker 4        kicker 5
+
+
+aces may have a value of 1 or 14 depending on the rank
+a kicker value of 0 may be used if there are insufficient cards to complete the hand.

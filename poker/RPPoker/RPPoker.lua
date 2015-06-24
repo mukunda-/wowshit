@@ -57,6 +57,32 @@ local g_state = STATE_SETUP
 local CARD_NAMES = { "Ace", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Jack", "Queen", "King" }
 local CARD_SUITS = { "Clubs", "Diamonds", "Hearts", "Spades" }
 
+local RANKS = {
+	ROYAL_FLUSH = 9,
+	STRAIGHT_FLUSH = 8,
+	FOUR_KIND = 7,
+	FULL_HOUSE = 6,
+	FLUSH = 5,
+	STRAIGHT = 4,
+	THREE_KIND = 3,
+	TWO_PAIR = 2,
+	ONE_PAIR = 1,
+	HIGH_CARD = 0,
+	
+	
+}
+
+-------------------------------------------------------------------------------
+local function ReverseTableSort( a, b )
+	return a > b
+end
+
+-------------------------------------------------------------------------------
+local function EncodeRank( rank, v1, v2, v3, v4, v5 ) {
+	return rank * 1048576 + (v1 or 0) * 65536 + (v2 or 0) * 4096 
+		   + (v3 or 0) * 256 + (v4 or 0) * 16 + (v5 or 0)
+}
+
 -------------------------------------------------------------------------------
 -- Loads a new shuffled deck.
 --
@@ -203,14 +229,20 @@ local function CardName( card )
 end
 
 -------------------------------------------------------------------------------
--- Returns the number and suit for a card.
+-- Parses a card value.
 --
-local function CardValue( card )
+-- @param card      Card value (1-52).
+-- @param aces_high Number aces as 14 instead of 1.
+-- @returns Number of card, Suit of card
+--
+local function CardValue( card, aces_high )
 	card = card - 1
 	local number = math.floor(card / 4)
 	local suit   = card - number*4
 	number = number + 1
 	suit   = suit + 1
+	
+	if aces_high and number == 1 then number = 14 end
 	
 	return number, suit
 end
@@ -644,16 +676,16 @@ local function DealHand()
 	
 end
 
+-- note that all computation functions should be made to handle 
+-- if there are less, or more, than 7 cards to choose from.
+
 -------------------------------------------------------------------------------
 local function ComputeRoyalFlush( cards )
 
-	local values = {}
-	for i = 1,4 do
-		values[i] = {}
-	end
+	local values = {{},{},{},{}}
 
-	for _,v in #cards do
-		local number, suit = CardValue( cards )
+	for _,v in ipairs( cards ) do
+		local number, suit = CardValue( v )
 		
 		if number == 1 then
 			values[suit][1] = true
@@ -666,7 +698,7 @@ local function ComputeRoyalFlush( cards )
 		if values[suit][1] and values[suit][2] and values[suit][3] 
 		   and values[suit][4] and values[suit][5] then
 		   
-			return 9437184
+			return EncodeRank( RANKS.ROYAL_FLUSH )
 		end
 	end
 	
@@ -675,7 +707,182 @@ end
 
 -------------------------------------------------------------------------------
 local function ComputeStraightFlush( cards )
+	local sets = {{},{},{},{}}
+	for _,v in ipairs( cards ) do
+		local number, suit = CardValue( v )
+		table.insert( sets[suit], number )
+	end
 	
+	local highest = 0 -- highest value straight flush found.
+	
+	for _,v in ipairs( sets ) do
+		if #v >= 5 then
+			table.sort( v )
+			if v[1] == 1 then table.insert( v, 14 ) end
+			
+			local found = 1
+			for i = 2,#v do
+				if v[i-1] == v[i]-1 then
+					found = found + 1
+					if found >= 5 then
+						highest = math.max( v[i], highest )
+					end
+				else
+					found = 1
+				end
+			end
+			
+			
+		end
+	end
+	
+	if highest ~= 0 then
+		return EncodeRank( RANKS.STRAIGHT_FLUSH, highest )
+	end
+	
+	return nil
+end
+
+-------------------------------------------------------------------------------
+local function ComputeFourKind( cards )
+	local counts = {}
+	
+	local found = 0
+	
+	for _,v in ipairs( cards ) do
+		local number, suit = CardValue( v, true )
+		counts[number] = (counts[number] or 0) + 1
+		if counts[number] == 4 then
+			found = math.max( found, number )
+		end
+	end
+	
+	if found ~= 0 then
+	
+		local cards2 = {}
+		for k,v in pairs( counts ) do
+			-- the keys are the card numbers found in the hand, aces high
+			if k ~= found then -- exclude the quad cards
+				table.insert( cards2, k )
+			end
+		end
+		
+		local kicker = 0
+		if #cards2 > 0 then
+			table.sort( cards2 )
+			kicker = cards2[#cards2]
+		end
+		
+		return EncodeRank( RANKS.FOUR_KIND, found, kicker )
+	end
+	
+	return nil
+end
+
+-------------------------------------------------------------------------------
+local function ComputeFullHouse( cards )
+	local counts = {}
+	
+	local triples, doubles = {}
+	
+	for _,v in ipairs( cards ) do
+		local number = CardValue( v, true )
+		
+		counts[number] = (counts[number] or 0) + 1
+		if counts[number] == 2 then
+			table.insert( doubles, number )
+		elseif counts[number] == 3 then
+			table.insert( triples, number )
+		end
+	end
+	
+	table.sort( triples, ReverseTableSort )
+	table.sort( doubles, ReverseTableSort )
+	
+	for _,v in ipairs( triples ) do
+		for _,v2 = ipairs( doubles ) do
+			if v2 ~= v then
+				-- both tables are sorted so this
+				-- is the highest combo found
+				return EncodeRank( RANKS.FULL_HOUSE, v, v2 )
+			end
+		end
+	end
+	
+	return nil
+end
+
+-------------------------------------------------------------------------------
+local function ComputeFlush( cards )
+	local counts = {} -- count of each suit
+	local highest = {} -- highest of each suit
+	
+	for _,v in ipairs( cards ) do
+		local number, suit = CardValue( v, true )
+		
+		counts[suit] = (counts[suit] or 0) + 1
+		highest[suit] = math.max( highest[suit] or 0, number )
+	end
+	
+	local value = 0
+	
+	for k,v in pairs( counts ) do
+		if v >= 5 then
+			-- flush was found, we want the flush with the
+			-- highest card value
+			value = math.max( value, highest[k] )
+		end
+	end
+	
+	if value ~= 0 then
+		
+		return EncodeRank( RANKS.FLUSH, value )
+	end
+	
+	return nil
+end
+
+-------------------------------------------------------------------------------
+local function ComputeStraight( cards )
+	local found = {}  -- filter object
+	
+	local cards2 = {} -- unique cards
+	
+	for _,v in ipairs( cards ) do 
+		local number = CardValue( v )
+		if not found[number] then
+			found[number] = true
+			table.insert( cards2, number )
+			if number == 1 then
+				table.insert( cards2, 14 )
+			end
+		end
+	end
+	
+	table.sort( cards2 )
+	
+	found = 1
+	local highest = 0
+	for i = 2,#cards2 do
+		if cards2[i]-1 = cards2[i-1] then
+			found = found + 1
+			if found >= 5 then
+				highest = math.max( highest, cards2[i] )	
+			end
+		else
+			found = 1
+		end
+	end
+	
+	if highest ~= 0 then
+		return EncodeRank( RANKS.STRAIGHT, highest )
+	end
+	
+	return nil
+end
+
+-------------------------------------------------------------------------------
+local function ComputeThreeKind( cards )
 	
 end
 
