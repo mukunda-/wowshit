@@ -678,6 +678,9 @@ end
 
 -- note that all computation functions should be made to handle 
 -- if there are less, or more, than 7 cards to choose from.
+--
+-- they -may- assume that a higher rank was already checked beforehand
+--
 
 -------------------------------------------------------------------------------
 local function ComputeRoyalFlush( cards )
@@ -883,6 +886,37 @@ end
 
 -------------------------------------------------------------------------------
 local function ComputeThreeKind( cards )
+
+	local cards2 = {}
+	
+	for k,v in ipairs(cards) do
+		local number = CardValue( cards, true )
+		table.insert( cards2, number )
+	endgg
+	table.sort( cards2, ReverseTableSort )
+	
+	local value = 0
+	local kickers = {0,0}
+	
+	for i = 1, #cards2-2 in ipairs( cards2 ) do
+		if cards2[i] == cards2[i+1] and cards2[i] == cards2[i+2] then
+			value = cards2[i]
+			table.remove( cards2, i )
+			table.remove( cards2, i )
+			table.remove( cards2, i )
+			break
+		end
+	end
+	
+	if value ~= 0 then
+		kickers[1] = cards2[1] or 0
+		kickers[2] = cards2[2] or 0
+		return EncodeRank( RANKS.THREE_KIND, kickers[1], kickers[2] )
+	end
+end
+
+-------------------------------------------------------------------------------
+local function ComputeTwoPairs( cards )
 	
 end
 
