@@ -676,14 +676,16 @@ local function DealHand()
 	
 end
 
+local CheckHand = {}
+
 -- note that all computation functions should be made to handle 
 -- if there are less, or more, than 7 cards to choose from.
 --
 -- they -may- assume that a higher rank was already checked beforehand
 --
-
+--[[ merged with straight flush
 -------------------------------------------------------------------------------
-local function ComputeRoyalFlush( cards )
+local function CheckHand.RoyalFlush( cards )
 
 	local values = {{},{},{},{}}
 
@@ -707,9 +709,10 @@ local function ComputeRoyalFlush( cards )
 	
 	return nil
 end
+]]--
 
 -------------------------------------------------------------------------------
-local function ComputeStraightFlush( cards )
+local function CheckHand.StraightFlush( cards )
 	local sets = {{},{},{},{}}
 	for _,v in ipairs( cards ) do
 		local number, suit = CardValue( v )
@@ -740,6 +743,10 @@ local function ComputeStraightFlush( cards )
 	end
 	
 	if highest ~= 0 then
+		if highest == 14 then
+			-- ace high is a royal flush.
+			return EncodeRank( RANKS.ROYAL_FLUSH )
+		end
 		return EncodeRank( RANKS.STRAIGHT_FLUSH, highest )
 	end
 	
@@ -747,7 +754,7 @@ local function ComputeStraightFlush( cards )
 end
 
 -------------------------------------------------------------------------------
-local function ComputeFourKind( cards )
+local function CheckHand.FourKind( cards )
 	local counts = {}
 	
 	local found = 0
@@ -783,7 +790,7 @@ local function ComputeFourKind( cards )
 end
 
 -------------------------------------------------------------------------------
-local function ComputeFullHouse( cards )
+local function CheckHand.FullHouse( cards )
 	local counts = {}
 	
 	local triples, doubles = {}
@@ -816,7 +823,7 @@ local function ComputeFullHouse( cards )
 end
 
 -------------------------------------------------------------------------------
-local function ComputeFlush( cards )
+local function CheckHand.Flush( cards )
 	local counts = {} -- count of each suit
 	local highest = {} -- highest of each suit
 	
@@ -846,7 +853,7 @@ local function ComputeFlush( cards )
 end
 
 -------------------------------------------------------------------------------
-local function ComputeStraight( cards )
+local function CheckHand.Straight( cards )
 	local found = {}  -- filter object
 	
 	local cards2 = {} -- unique cards
@@ -885,14 +892,14 @@ local function ComputeStraight( cards )
 end
 
 -------------------------------------------------------------------------------
-local function ComputeThreeKind( cards )
+local function CheckHand.ThreeKind( cards )
 
 	local cards2 = {}
 	
 	for k,v in ipairs(cards) do
 		local number = CardValue( cards, true )
 		table.insert( cards2, number )
-	endgg
+	end
 	table.sort( cards2, ReverseTableSort )
 	
 	local value = 0
@@ -916,8 +923,77 @@ local function ComputeThreeKind( cards )
 end
 
 -------------------------------------------------------------------------------
-local function ComputeTwoPairs( cards )
+local function CheckHand.TwoPairs( cards )
+	local found = {}
+	local kicker = 0
 	
+	local cards2 = {}
+	
+	for k,v in ipairs(cards) do
+		local number = CardValue( cards, true )
+		table.insert( cards2, number )
+	end
+	table.sort( cards2, ReverseTableSort )
+	
+	-- note that its assumed that there are no three cards in a row.
+	
+	local i = 1
+	while i <= #cards2-1 do
+		if cards2[i] == cards2[i+1] then
+			found[#found+1] = cards2[i]
+			table.remove( cards2, i )
+			table.remove( cards2, i )
+			
+			if #found == 2 then break end
+		else
+			i = i + 1
+		end
+	end
+	
+	if #found == 2 then
+		kicker = cards2[1] or 0
+		return EncodeRank( RANKS.TWO_PAIR, found[1], found[2], cards2[1] or 0 )
+	end
+end
+
+-------------------------------------------------------------------------------
+local function CheckHand.OnePair( cards )
+	local found = 0
+	local cards2 = {}
+	for k,v in ipairs( cards ) do
+		local number = CardValue( cards, true )
+		table.insert( cards2, number )
+	end
+	table.sort( cards2, ReverseTableSort )
+	
+	while i <= #cards2-1 do
+	
+		if cards2[i] == cards2[i+1] then
+			found = cards2[i]
+			table.remove( cards2, i )
+			table.remove( cards2, i )
+			break
+		end
+	end
+	
+	if found ~= 0 then
+		return EncodeRank( RANKS.ONE_PAIR, found, 
+		                   cards2[1] or 0, cards2[2] or 0, cards2[3] or 0 )
+	end
+end
+
+-------------------------------------------------------------------------------
+local function CheckHand.HighCard( cards )
+	local cards2 = {}
+	for k,v in ipairs( cards ) do
+		local number = CardValue( cards, true )
+		table.insert( cards2, number )
+	end
+	table.sort( cards2, ReverseTableSort )
+	
+	return EncodeRank( RANKS.HIGH_CARD, cards2[1] or 0, cards2[2] or 0, 
+	                                    cards2[3] or 0, cards2[4] or 0,
+										cards2[5] or 0 )
 end
 
 -------------------------------------------------------------------------------
@@ -932,11 +1008,11 @@ local function ComputeRank( p )
 		table.insert( cards, v )
 	end
 	
-	local r = ComputeRoyalFlush(cards) or ComputeStraightFlush(cards) or 
-			  ComputeFourKind(cards)   or ComputeFullHouse(cards) or 
-			  ComputeFlush(cards)      or ComputeStraight(cards) or 
-			  ComputeThreeKind(cards)  or ComputeTwoPair(cards) or
-			  ComputeOnePair(cards)    or ComputeHighCard(cards)
+	local r = CheckHand.RoyalFlush(cards) or CheckHand.StraightFlush(cards) or
+			  CheckHand.FourKind(cards)   or CheckHand.FullHouse(cards) or 
+			  CheckHand.Flush(cards)      or CheckHand.Straight(cards) or 
+			  CheckHand.ThreeKind(cards)  or CheckHand.TwoPair(cards) or
+			  CheckHand.OnePair(cards)    or CheckHand.HighCard(cards)
 			  
 	p.rank = r
 end
