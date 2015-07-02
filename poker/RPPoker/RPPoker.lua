@@ -600,7 +600,7 @@ local function EndHand()
 	CheckPots()
 	
 	if ActivePlayers() == 1 then
-		--
+		--  
 	end
 end
 
@@ -608,7 +608,8 @@ end
 -- Distribute pots to winning players
 --
 local function CheckPots()
-	
+	-- what does this do? checks all hands and distributes pots according
+	-- to individual bets?
 end
 
 -------------------------------------------------------------------------------
