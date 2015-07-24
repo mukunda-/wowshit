@@ -1,0 +1,8 @@
+## Interface: 60100
+## Title: CDPlease
+## Notes: External cooldown beggar.
+## Author: mukunda
+## SavedVariables: CDPleaseSaved
+## OptionalDeps:  
+## Version: 0.1
+CDPlease.lua
