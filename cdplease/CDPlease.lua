@@ -7,6 +7,7 @@
 --   send query to raid
 --   gather responses within threshold (250ms)
 --   request 
+--
 
 local cd_call_time = 0
 
