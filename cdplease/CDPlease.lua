@@ -19,6 +19,7 @@ end
 
 local function CallCD()
 	if GetTime() - cd_call_time < 1 then
+
 		return -- ignore button spam
 	end
 	
