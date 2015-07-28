@@ -23,5 +23,6 @@ local function CallCD()
 		return -- ignore button spam
 	end
 	
-	
+	SendAddonMessage( "CDPLEASE", "ASK", "RAID" )
 end
+
