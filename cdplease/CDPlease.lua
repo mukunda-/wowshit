@@ -9,6 +9,10 @@
 --   request 
 --
 
+local MyAddon = LibStub("AceAddon-3.0"):NewAddon("CDPlease")
+
+
+
 local cd_call_time = 0
 
 SLASH_CDPLEASE = "/cdplease"
@@ -23,6 +27,10 @@ local function CallCD()
 		return -- ignore button spam
 	end
 	
+	cd_call_time = GetTime()
+	
 	SendAddonMessage( "CDPLEASE", "ASK", "RAID" )
+	
+	
 end
 

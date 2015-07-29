@@ -1,8 +1,9 @@
 ## Interface: 60100
 ## Title: CDPlease
-## Notes: External cooldown beggar.
+## Notes: External defensive CD queries.
 ## Author: mukunda
 ## SavedVariables: CDPleaseSaved
 ## OptionalDeps:  
 ## Version: 0.1
-CDPlease.lua
+embeds.xml
+cdplease.lua
