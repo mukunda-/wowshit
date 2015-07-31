@@ -2,6 +2,8 @@
 -- CDPlease
 -- (C) 2015 Mukunda Johnson (mukunda@mukunda.com)
 -------------------------------------------------------------------------------
+-- version 1.0 beta
+-------------------------------------------------------------------------------
 --
 -- protocol:
 --
@@ -88,7 +90,7 @@ local g_ani_finished        = true
 local COMM_PREFIX  = "CDPLEASE"
 
 local QUERY_WAIT_TIME = 0.25   -- time to wait for cd responses
-local QUERY_TIMEOUT   = 1.0    -- time to give up query
+local QUERY_TIMEOUT   = 1.8    -- time to give up query
 local CD_WAIT_TIMEOUT = 7.0    -- time to allow user to give us a cd
 local HARD_QUERY_TIMEOUT = 5.0 -- time for the query to stop even
                                -- when there are options left!
@@ -104,7 +106,7 @@ local CD_SPELLS = {
 	114030; -- vigilance
 	122844; -- painsup
 	6940;   -- sac
-	116841; -- tigers lust (debug)
+--	116841; -- tigers lust (debug)
 }
 
 local CD_MAP = {
@@ -112,7 +114,7 @@ local CD_MAP = {
 	[114030] = "Vigilance";
 	[122844] = "Pain Suppression";
 	[6940]   = "Hand of Sacrifice";
-	[116841] = "Tiger's Lust"; -- (debug)
+--	[116841] = "Tiger's Lust"; -- (debug)
 }
  
 -------------------------------------------------------------------------------
@@ -140,40 +142,7 @@ function CDPlease:OnAddonLoaded( event, arg1 )
 		end
 	end
 end
---[[
--------------------------------------------------------------------------------
-function CDPlease:OnSpellcastSucceeded( event, unit, spell, rank, line, id )
-	if g_query_active and unit == g_query_unit then
-		local n = CD_MAP[id]
-		
-		if n then
-			if UnitBuff( "player", n ) then
-				g_query_active = false
-				self:SetAnimation( "QUERY", "SUCCESS" )
-				-- play good sound.
-			end
-		end
-	end
-	
-	if g_help_active then
-		local n = CD_MAP[id]
-		
-		if n then
-			g_help_active = false
-			
-			if UnitBuff( g_help_unit, n ) then
-				
-				self:SetAnimation( "HELP", "SUCCESS" )
-				-- play good sound.
-			else
-				self:SetAnimation( "HELP", "FAILURE" )
-				-- play bad sound.
-			end
-		end
-	end
-end
-]]
-
+ 
 -------------------------------------------------------------------------------
 function CDPlease:OnCombatLogEvent( event, ... ) 
 	local timestamp,evt,_,sourceGUID,_,_,_,destGUID,_,_,_,spellID = ...
@@ -190,23 +159,27 @@ function CDPlease:OnCombatLogEvent( event, ... )
 					self:SetAnimation( "QUERY", "SUCCESS" )
 					g_query_active = false
 					
-					-- play good sound.
+					self:PlaySound( "GOOD" )
+					
 				else
 					-- cd was cast on someone else! find another one!
 					g_query_requested = false
 				end
 			end
 			
-			print (sourceGUID, UnitGUID("player"), g_help_active)
+ 
 			if g_help_active and sourceGUID == UnitGUID("player") then
-				print("c")
+		 
 				if destGUID == UnitGUID( g_help_unit ) then
-					print("a")
+					
+					self:PlaySound( "GOOD" )
+					
 					-- good sound
 					self:SetAnimation( "HELP", "SUCCESS" )
 					g_help_active = false
 				else
-					print("b")
+					self:PlaySound( "FAIL" )
+					
 					-- bad sound!
 					self:SetAnimation( "HELP", "FAILURE" )
 					g_help_active = false
@@ -224,6 +197,8 @@ function CDPlease:Unlock()
 		print( "Cannot unlock in combat!" )
 		return
 	end
+	
+	if g_query_active or g_help_active then return end
 	 
 	if not g_drag_stuff then
 		g_drag_stuff = {}
@@ -252,7 +227,10 @@ function CDPlease:Unlock()
 	end
 	g_frame:EnableMouse( true )
 	g_frame:Show()
+	
 	self:ShowText( "Right click to lock." )
+	g_frame.text:SetTextColor( 1, 1, 1, 1 )
+	
 	g_unlocked = true
 	CDPleaseSaved.locked = false
 end
@@ -383,7 +361,7 @@ end
 -- already being asked for.
 --
 local function HasCDReady( ignore_reserve )
-	if g_help_active and not ignore_reserve then 
+	if (g_help_active or g_unlocked) and not ignore_reserve then 
 		-- someone is already asking us!
 		return false
 	end
@@ -465,8 +443,7 @@ end
 
 -------------------------------------------------------------------------------
 function CDPlease:RespondReady( sender )
-	self:SendCommMessage( COMM_PREFIX, "READY", "WHISPER", sender )
-	print( sender )
+	self:SendCommMessage( COMM_PREFIX, "READY", "WHISPER", sender ) 
 end
  
 -------------------------------------------------------------------------------
@@ -501,8 +478,12 @@ function CDPlease:RequestCD( sort )
 	self:SendCommMessage( COMM_PREFIX, "CD", "WHISPER", UnitName( unit ))
 	
 	self:SetAnimation( "QUERY", "ASKING" )
+	self:PlaySound( "ASK" )
 	
-	-- show cd window 
+	if not g_help_active then
+		self:ShowText( UnitName( g_query_unit ))
+	end
+	 
 	return true
 	
 end
@@ -536,6 +517,10 @@ function CDPlease:CallCD()
 	g_frame:Show()
 	self:SetAnimation( "QUERY", "POLLING" )
 	
+	if not g_help_active then
+		self:HideText()
+	end
+	
 	self:SendCommMessage( COMM_PREFIX, "ASK", "RAID" )
 	
 	DoEmote( "helpme" )
@@ -553,7 +538,7 @@ function CDPlease:OnQueryUpdate()
 	
 		if t2 >= HARD_QUERY_TIMEOUT then
 			
-			-- fail sound
+			self:PlaySound( "FAIL" )
 			self:SetAnimation( "QUERY", "FAILURE" )
 			g_query_active = false
 			return
@@ -563,7 +548,7 @@ function CDPlease:OnQueryUpdate()
 			if not self:RequestCD() then
 				if t2 >= QUERY_TIMEOUT then
 				
-					-- todo: fail sound
+					self:PlaySound( "FAIL" )
 					self:SetAnimation( "QUERY", "FAILURE" )
 					g_query_active = false
 					return
@@ -573,6 +558,7 @@ function CDPlease:OnQueryUpdate()
 		
 	else 
 		if t >= CD_WAIT_TIMEOUT then
+			self:PlaySound( "FAIL" )
 			self:SetAnimation( "QUERY", "FAILURE" )
 			g_query_active = false
 		end
@@ -587,7 +573,8 @@ function CDPlease:OnHelpUpdate()
 	if GetTime() >= g_help_pulse then
 		g_help_pulse = g_help_pulse + 1
 		self:SetAnimation( "HELP", "HELP" )
-		-- todo: beep!
+		
+		self:PlaySound( "HELP" )
 	end
 	--
 --	if not HasCDReady( true ) then
@@ -598,7 +585,7 @@ function CDPlease:OnHelpUpdate()
 --	end
 	
 	if t >= CD_WAIT_TIMEOUT then
-		
+		self:PlaySound( "FAIL" )
 		self:SetAnimation( "HELP", "FAILURE" )
 		g_help_active = false
 		return
@@ -649,18 +636,31 @@ function CDPlease:NoCDAvailable()
 end
 
 -------------------------------------------------------------------------------
+local SOUND_LIST = {
+	["FAIL"] = "Interface\\Addons\\cdplease\\sounds\\fail.ogg";
+	["ASK"]  = "Interface\\Addons\\cdplease\\sounds\\ask.ogg";
+	["HELP"] = "Interface\\Addons\\cdplease\\sounds\\help.ogg";
+	["GOOD"] = "Interface\\Addons\\cdplease\\sounds\\good.ogg";
+}
+
+function CDPlease:PlaySound( sound )
+	local s = SOUND_LIST[sound]
+	if s == nil then return end
+	PlaySoundFile( s, "Master" )
+end
+
+-------------------------------------------------------------------------------
 function CDPlease:ShowHelpRequest( sender )
 	g_help_active = true
 	g_help_unit   = UnitIDFromName( sender )
 	g_help_time   = GetTime()
 	g_help_pulse  = GetTime() + 1
+	self:PlaySound( "HELP" )
 	
 	self:ShowText( UnitName( g_help_unit ))
 	self:SetAnimation( "HELP", "HELP" )
 	g_frame:Show()
-	
-	-- show window
-	-- set text to sender
+	 
 	
 	self:EnableFrameUpdates()
 end
@@ -686,18 +686,21 @@ function CDPlease:UpdateAnimation()
 	if g_ani_state == "ASKING" then
 		local r,g,b = ColorLerp( 1,1,1, 1,0.7,0.2, t / 0.25 )
 		g_frame.icon:SetVertexColor( r, g, b, 1 )
+		g_frame.text:SetTextColor( 1, 1, 1, 1 )
 		if t >= 1.0 then g_ani_finished = true end
 		
 	elseif g_ani_state == "SUCCESS" then
 		
 		local a = 1.0 - math.min( t / 0.5, 1 )
 		g_frame.icon:SetVertexColor( 0.3, 1, 0.3, a )
+		g_frame.text:SetTextColor  ( 0.3, 1, 0.3, a )
 		if t >= 0.5 then g_ani_finished = true end
 		
 	elseif g_ani_state == "FAILURE" then
 	
 		local a = 1.0 - math.min( t / 0.5, 1 )
 		g_frame.icon:SetVertexColor( 1, 0.1, 0.2, a )
+		g_frame.text:SetTextColor  ( 1, 0.1, 0.2, a )
 		if t >= 0.5 then g_ani_finished = true end
 		
 	elseif g_ani_state == "POLLING" then
@@ -708,12 +711,16 @@ function CDPlease:UpdateAnimation()
 		
 		r,g,b = ColorLerp( 1,1,1,r,g,b, t / 0.2 )
 		g_frame.icon:SetVertexColor( r, g, b, 1 )
+		g_frame.text:SetTextColor( 1,1,1,1 )
 		if t >= 1.0 then g_ani_finished = true end
 		
 	elseif g_ani_state == "HELP" then
 		local r,g,b = ColorLerp( 1,1,1, 0.5,0,0.5, t/0.25 )
 		g_frame.icon:SetVertexColor( r, g, b, 1 )
+		g_frame.text:SetTextColor( 1,1,1,1 )
 		if t >= 1.0 then g_ani_finished = true end
+	else
+		g_frame.text:SetTextColor( 1,1,1,1 )
 	end
 end
 
