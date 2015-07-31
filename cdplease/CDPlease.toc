@@ -2,8 +2,8 @@
 ## Title: CDPlease
 ## Notes: External defensive CD queries.
 ## Author: mukunda
-## SavedVariables: CDPleaseSaved
-## OptionalDeps:  
+## SavedVariablesPerCharacter: CDPleaseSaved
+## OptionalDeps: Masque
 ## Version: 0.1
 embeds.xml
 cdplease.lua

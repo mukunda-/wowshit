@@ -78,10 +78,10 @@ local function ReverseTableSort( a, b )
 end
 
 -------------------------------------------------------------------------------
-local function EncodeRank( rank, v1, v2, v3, v4, v5 ) {
+local function EncodeRank( rank, v1, v2, v3, v4, v5 )  
 	return rank * 1048576 + (v1 or 0) * 65536 + (v2 or 0) * 4096 
 		   + (v3 or 0) * 256 + (v4 or 0) * 16 + (v5 or 0)
-}
+end
 
 -------------------------------------------------------------------------------
 -- Loads a new shuffled deck.
