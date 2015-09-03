@@ -4,10 +4,9 @@ aura_env.data = aura_env.data or {}
 function aura_env.Text()
     
     local name,realm = UnitName("target")
-    local sex = UnitSex("target")
+	
     if name == nil then 
         name,realm = UnitName("mouseover") 
-        sex = UnitSex("mouseover")
     end
     
     if not name then return "" end
@@ -26,13 +25,10 @@ function aura_env.Text()
 end
 
 -------------------------------------------------------------------------------
-function aura_env.BuildText( data, sex )
+function aura_env.BuildText( data )
 	
 	local text = ""
 	
-	if sex == 2 then sex = "He"
-	elseif sex == 3 then sex = "She"
-	else sex = "They" end
 	
 	for k,v in ipairs(data) do
 	
@@ -41,7 +37,7 @@ function aura_env.BuildText( data, sex )
 		if v.type == 1 then
 			msg = "|cffef5d0d".. msg 
 		elseif v.type == 2 then
-			msg = '|cfff18d0a'.. sex .. ' ' .. msg 
+			msg = '|cfff18d0a'.. ' ' .. msg 
 		elseif v.type == 3 then
 			msg = '|cffffffff'.. msg
 		elseif v.type == 4 then
