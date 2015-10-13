@@ -1,8 +1,12 @@
-## Interface: 60100
+## Interface: 60200
 ## Title: RP Poker
 ## Notes: RP Poker Server
 ## Author: mukunda
 ## SavedVariables: RPPokerSaved
 ## OptionalDeps:  
-## Version: 0.1
-RPPoker.xml
+## Version: 1.0
+
+embeds.xml
+init.lua
+
+RPPoker.lua
