@@ -116,7 +116,7 @@ local function FullHouse( cards )
 	table.sort( doubles, ReverseTableSort )
 	
 	for _,v in ipairs( triples ) do
-		for _,v2 = ipairs( doubles ) do
+		for _,v2 in ipairs( doubles ) do
 			if v2 ~= v then
 				-- both tables are sorted so this
 				-- is the highest combo found
@@ -180,7 +180,7 @@ local function Straight( cards )
 	found = 1
 	local highest = 0
 	for i = 2,#cards2 do
-		if cards2[i]-1 = cards2[i-1] then
+		if cards2[i]-1 == cards2[i-1] then
 			found = found + 1
 			if found >= 5 then
 				highest = math.max( highest, cards2[i] )	
@@ -211,7 +211,7 @@ local function ThreeKind( cards )
 	local value = 0
 	local kickers = {0,0}
 	
-	for i = 1, #cards2-2 in ipairs( cards2 ) do
+	for i = 1, #cards2-2 do
 		if cards2[i] == cards2[i+1] and cards2[i] == cards2[i+2] then
 			value = cards2[i]
 			table.remove( cards2, i )
@@ -305,11 +305,26 @@ local function HighCard( cards )
 end
 
 -------------------------------------------------------------------------------
+-- Compute a hand ranking value from a set of cards.
+--
+-- @param cards One or more cards to compute the rank from. It will pick
+--              the five most-valued cards to produce the rank value.
+--
+function RPPoker:ComputeHandRank( cards )
+	
+	return StraightFlush(cards)
+		   or FourKind(cards)  or FullHouse(cards)
+		   or Flush(cards)     or Straight(cards)
+		   or ThreeKind(cards) or TwoPair(cards)
+		   or OnePair(cards)   or HighCard(cards)
+end
+
+-------------------------------------------------------------------------------
 -- Update a player's hand ranking value from their cards.
 --
 -- @param player Reference to player in game players table.
 --
-function RPPoker:ComputeHankRank( player )
+function RPPoker:UpdatePlayerRank( player )
 
 	-- cards is table cards and player cards combined
 	local cards = {}
@@ -322,11 +337,5 @@ function RPPoker:ComputeHankRank( player )
 		table.insert( cards, v )
 	end
 	
-	local r = StraightFlush(cards)
-			  or FourKind(cards)  or FullHouse(cards)
-			  or Flush(cards)     or Straight(cards)
-			  or ThreeKind(cards) or TwoPair(cards)
-			  or OnePair(cards)   or HighCard(cards)
-			  
-	p.rank = r
+	p.rank = self:ComputeHandRank( cards )
 end

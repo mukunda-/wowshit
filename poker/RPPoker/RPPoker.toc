@@ -9,4 +9,8 @@
 embeds.xml
 init.lua
 
+config.lua
+
 RPPoker.lua
+ui.lua
+handrank.lua

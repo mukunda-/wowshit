@@ -1,5 +1,7 @@
+local Main = RPPoker
 
-RPPoker.Game = {
+-------------------------------------------------------------------------------
+Main.Game = {
 	players = {};
 
 	-- player, index is the seat number
@@ -16,8 +18,8 @@ RPPoker.Game = {
 -- nil assignments are just for documentation purpose
 
 	dealer      = nil;
-	button_icon = nil;
-	turn_icon   = nil;
+--	button_icon = nil;
+--	turn_icon   = nil;
 
 -- TODO; copy these from config on game start
 	ante        = nil;
@@ -50,12 +52,12 @@ RPPoker.Game = {
 	table  = {};           -- community cards
 }
 
-RPPoker.CARD_NAMES = { "Ace", "Two", "Three", "Four", "Five", "Six", "Seven", 
+Main.CARD_NAMES = { "Ace", "Two", "Three", "Four", "Five", "Six", "Seven", 
                        "Eight", "Nine", "Ten", "Jack", "Queen", "King" }
-RPPoker.CARD_SUITS = { "Clubs", "Diamonds", "Hearts", "Spades" }
+Main.CARD_SUITS = { "Clubs", "Diamonds", "Hearts", "Spades" }
 
 -------------------------------------------------------------------------------
-RPPoker.RANKS = {
+Main.RANKS = {
 	ROYAL_FLUSH    = 9;
 	STRAIGHT_FLUSH = 8;
 	FOUR_KIND      = 7;
@@ -71,7 +73,7 @@ RPPoker.RANKS = {
 -------------------------------------------------------------------------------
 -- Loads a new shuffled deck.
 --
-function RPPoker.Game:NewDeck()
+function Main.Game:NewDeck()
 	self.deck = {}
 	
 	-- insert 52 cards.
@@ -97,7 +99,7 @@ end
 --
 -- @returns card index.
 --
-function RPPoker.Game:DrawCard()
+function Main.Game:DrawCard()
 	if self.deck[1] == nil then self:NewDeck() end
 	
 	local a = self.deck[1]
@@ -113,7 +115,7 @@ end
 -- @param player Player to give the card to. Defaults to CurrentPlayer()
 -- @returns true if a card was given, false if the player is folded.
 --
-function RPPoker.Game:DealCard( player )
+function Main.Game:DealCard( player )
 
 	local p = player or self:CurrentPlayer()
 	
@@ -125,7 +127,7 @@ end
 -------------------------------------------------------------------------------
 -- Initialize a new player table.
 --
-function RPPoker.Game:CreatePlayer( name, credit )
+function Main.Game:CreatePlayer( name, credit )
 	return {
 		name   = name;
 		credit = credit;
@@ -142,7 +144,7 @@ end
 -------------------------------------------------------------------------------
 -- Get the player whose turn is active
 --
-function RPPoker.Game:CurrentPlayer()
+function Main.Game:CurrentPlayer()
 	return self.players[self.turn]
 end
 
@@ -151,7 +153,7 @@ end
 --
 -- @returns false if there are no players remaining.
 --
-function RPPoker.Game:NextTurn()
+function Main.Game:NextTurn()
 	local t = self.turn
 	for i = 1, #self.players do
 		self.turn = self.turn + 1
@@ -168,7 +170,7 @@ end
 -------------------------------------------------------------------------------
 -- Set the current turn.
 --
-function RPPoker.Game:SetTurn( index )
+function Main.Game:SetTurn( index )
 	self.turn = index
 	
 	assert( self.players[self.turn] ~= nil 
@@ -180,12 +182,12 @@ end
 --
 -- @param name Name of player.
 --
-function RPPoker.Game:AddPlayer( name, credit ) 
+function Main.Game:AddPlayer( name, credit ) 
 	for k,v in pairs(self.players) do
 		if v.name == name then return end -- player already added
 	end
 	
-	table.insert( self.players, CreatePlayer(name, credit) )
+	table.insert( self.players, self:CreatePlayer(name, credit) )
 end
 
 -------------------------------------------------------------------------------
@@ -193,7 +195,7 @@ end
 --
 -- @param name Name of player.
 --
-function RPPoker.Game:RemovePlayer( name )
+function Main.Game:RemovePlayer( name )
 	for k,v in pairs(self.players) do
 		if v.name == name then 
 			table.remove( self.players, k ) 
@@ -205,16 +207,22 @@ end
 -------------------------------------------------------------------------------
 -- Reset the table.
 --
-function RPPoker.Game:ResetGame()
+function Main.Game:ResetGame()
 	self.dealer = math.random( 1, #self.players )
 	self.pot    = 0
-	NewDeck()
+	
+	self.ante        = Main.Config.db.profile.ante
+	self.small_blind = Main.Config.db.profile.small_blind
+	self.big_blind   = Main.Config.db.profile.big_blind
+	self.multiplier  = Main.Config.db.profile.multiplier
+	
+	self:NewDeck()
 end
 
 -------------------------------------------------------------------------------
 -- Returns the name of a card.
 --
-function RPPoker.Game:CardName( card )
+function Main.Game:CardName( card )
 	local number, suit = CardValue( card )
 	
 	return self.CARD_NAMES[number] .. " of " .. self.CARD_SUITS[suit]
@@ -227,7 +235,7 @@ end
 -- @param aces_high Number aces as 14 instead of 1.
 -- @returns Number of card, Suit of card
 --
-function RPPoker.Game:CardValue( card, aces_high )
+function Main.Game:CardValue( card, aces_high )
 	card = card - 1
 	local number = math.floor(card / 4)
 	local suit   = card - number*4
@@ -244,7 +252,7 @@ end
 --
 -- @param player Player data.
 --
-function RPPoker.Game:TellCards( player )
+function Main.Game:TellCards( player )
 	
 	local msg = string.format( "Your cards: %s, %s. Credit: %dg",
 							   self:CardName( p.hand[1] ), 
@@ -260,7 +268,7 @@ end
 -- If they have insufficient funds then it marks them as all-in and
 -- bets as much as they have.
 --
-function RPPoker.Game:AddBet( player, amount )
+function Main.Game:AddBet( player, amount )
 	
 	-- player goes all in if they cant afford the bet
 	-- take care to not allow players to bet higher than they own
@@ -289,7 +297,7 @@ end
 -------------------------------------------------------------------------------
 -- Deal cards.
 --
-function RPPoker.Game:PlayerDealCards() 
+function Main.Game:PlayerDealCards() 
 	assert( self.turn == self.dealer )
 	
 	local x = self.dealer
@@ -307,7 +315,7 @@ end
 -------------------------------------------------------------------------------
 -- Ante up for all players.
 --
-function RPPoker.Game:PlayerAnteUp()
+function Main.Game:PlayerAnteUp()
 	for _,p in pairs(self.players) do
 	
 		if not p.folded then
@@ -319,7 +327,7 @@ end
 -------------------------------------------------------------------------------
 -- Bet the small blind.
 --
-function RPPoker.Game:PlayerBetSmallBlind()
+function Main.Game:PlayerBetSmallBlind()
 	local p = CurrentPlayer()
 	AddBet( CurrentPlayer(), self.small_blind )
 end
@@ -327,14 +335,14 @@ end
 -------------------------------------------------------------------------------
 -- Bet the big blind.
 --
-function RPPoker.Game:PlayerBetBigBlind()
+function Main.Game:PlayerBetBigBlind()
 	
 	local p = CurrentPlayer()
 	AddBet( CurrentPlayer(), self.big_blind )
 end
 
 -------------------------------------------------------------------------------
-function RPPoker.Game:AnnounceTurn()
+function Main.Game:AnnounceTurn()
 	local p = CurrentPlayer()
 	
 	local actions = ""
@@ -342,7 +350,7 @@ function RPPoker.Game:AnnounceTurn()
 end
 
 -------------------------------------------------------------------------------
-function RPPoker.Game:PartyPrint( text )
+function Main.Game:PartyPrint( text )
 	local channel
 	
 	if IsInRaid() then
@@ -357,7 +365,7 @@ end
 -------------------------------------------------------------------------------
 -- Returns the amount of players that aren't folded.
 --
-function RPPoker.Game:ActivePlayers() 
+function Main.Game:ActivePlayers() 
 	local count = 0
 	for k,v in pairs(self.players) do
 		if not v.folded then
@@ -368,7 +376,7 @@ function RPPoker.Game:ActivePlayers()
 end
 
 -------------------------------------------------------------------------------
-function RPPoker.Game:CallAmount( player )
+function Main.Game:CallAmount( player )
 	return self.bet - player.bet
 end
 
@@ -376,7 +384,7 @@ end
 -- Reset the "acted" state for each player, do this after the 
 -- bet is raised.
 --
-function RPPoker.Game:ResetActed()
+function Main.Game:ResetActed()
 	for k,v in pairs(self.players) do
 		
 		if not v.folded and not v.allin then
@@ -388,11 +396,11 @@ end
 -------------------------------------------------------------------------------
 -- Player action: Call
 --
-function RPPoker.Game:PlayerCall()
+function Main.Game:PlayerCall()
 	local p = self:CurrentPlayer()
 	
 	if p.credit < self:CallAmount(p) then
-		RPPoker:Print( "Insufficient credit." )
+		Main:Print( "Insufficient credit." )
 		return
 	end
 	
@@ -405,11 +413,11 @@ end
 -------------------------------------------------------------------------------
 -- Player action: Check
 --
-function RPPoker.Game:PlayerCheck()
+function Main.Game:PlayerCheck()
 	local p = self:CurrentPlayer()
 	
-	if self:CallAmount(p) != 0 then
-		RPPoker:Print( "Check not allowed." )
+	if self:CallAmount(p) ~= 0 then
+		Main:Print( "Check not allowed." )
 		return
 	end
 	
@@ -423,10 +431,10 @@ end
 --
 -- @param amount Amount to add to the bet, minimum is the big blind.
 --
-function RPPoker.Game:PlayerBet( amount )
+function Main.Game:PlayerBet( amount )
 	local p = self:CurrentPlayer()
 	
-	if self:CallAmount(p) != 0 then
+	if self:CallAmount(p) ~= 0 then
 		print( "Player must raise, not bet." )
 		return
 	end
@@ -448,22 +456,22 @@ end
 --
 -- @param amount Amount to add to the bet, minimum is the big blind.
 --
-function RPPoker.Game:PlayerRaise( amount )
+function Main.Game:PlayerRaise( amount )
 	local p = self:CurrentPlayer()
 	
 	if self.raises >= self.max_raises then
-		RPPoker:Print( "Cannot raise higher." )
+		Main:Print( "Cannot raise higher." )
 		return
 	end
 	
 	if amount < self.big_blind then 
-		RPPoker:Print( "Must raise at least the big blind amount." )
+		Main:Print( "Must raise at least the big blind amount." )
 		return
 	end
 	
 	amount = amount + CallAmount(p)
 	if amount > p.credit then
-		RPPoker:Print( "Insufficient credit." )
+		Main:Print( "Insufficient credit." )
 		return
 	end
 	
@@ -477,7 +485,7 @@ end
 -------------------------------------------------------------------------------
 -- Player action: Fold
 --
-function RPPoker.Game:PlayerFold()
+function Main.Game:PlayerFold()
 	local p = self:CurrentPlayer()
 	assert( not p.folded )
 	
@@ -488,12 +496,12 @@ end
 -------------------------------------------------------------------------------
 -- Player action: All-in
 --
-function RPPoker.Game:PlayerAllIn()
+function Main.Game:PlayerAllIn()
 	local p = self:CurrentPlayer()
 	assert( not p.folded )
 	
 	if p.credit > self:CallAmount(p) then
-		local raise = p.credit = self:CallAmount(p)
+		local raise = p.credit - self:CallAmount(p)
 		
 		-- full raise rule
 		if raise > self.big_blind then
@@ -510,7 +518,7 @@ end
 -------------------------------------------------------------------------------
 -- Returns the next non-folded player from the index.
 --
-function RPPoker.Game:FindNextPlayer( index )
+function Main.Game:FindNextPlayer( index )
 	
 	for i = 1,#self.players do
 		index = index + 1
@@ -524,7 +532,9 @@ function RPPoker.Game:FindNextPlayer( index )
 end
 
 -------------------------------------------------------------------------------
-function RPPoker.Game:AllPlayersActed()
+-- Returns true if all players have "acted" during the current round.
+--
+function Main.Game:AllPlayersActed()
 	for i = 1, #self.players do
 		if not self.players[i].acted then return false end
 	end
@@ -537,7 +547,7 @@ end
 --
 -- @param reset_pos Reset the turn to the person left of the dealer.
 --
-function RPPoker.Game:StartBettingRound( reset_pos )
+function Main.Game:StartBettingRound( reset_pos )
 	self.round_complete = false
 	
 	if reset_pos then
@@ -549,7 +559,7 @@ function RPPoker.Game:StartBettingRound( reset_pos )
 end
 
 -------------------------------------------------------------------------------
-function RPPoker.Game:ContinueBettingRound()
+function Main.Game:ContinueBettingRound()
 
 	if self:ActivePlayers() == 1 then
 		-- everyone else folded.
@@ -560,7 +570,7 @@ function RPPoker.Game:ContinueBettingRound()
 	self:CheckPots()
 	
 	-- find next turn
-	while( not self:AllPlayersActed() )
+	while( not self:AllPlayersActed() ) do
 		local p = self:CurrentPlayer()
 		if p.acted then
 			self:NextTurn()
@@ -575,15 +585,15 @@ function RPPoker.Game:ContinueBettingRound()
 end
 
 -------------------------------------------------------------------------------
-function RPPoker.Game:NextRound() 
+function Main.Game:NextRound() 
 	if not self.round_complete then
-		RPPoker:Print( "The current round is not complete." )
+		Main:Print( "The current round is not complete." )
 		return
 	end
 end
 
 -------------------------------------------------------------------------------
-function RPPoker.Game:EndHand()
+function Main.Game:EndHand()
 	assert( not self.hand_complete )
 	
 	self.hand_complete = true
@@ -598,23 +608,23 @@ end
 -------------------------------------------------------------------------------
 -- Distribute pots to winning players
 --
-function RPPoker.Game:CheckPots()
+function Main.Game:CheckPots()
 	-- what does this do? checks all hands and distributes pots according
 	-- to individual bets?
 end
 
 -------------------------------------------------------------------------------
-function RPPoker.Game:SortWinners()
+function Main.Game:SortWinners()
 	
 end
 
 -------------------------------------------------------------------------------
 -- Start a new hand.
 --
-function RPPoker.Game:DealHand()
+function Main.Game:DealHand()
 	
 	-- emote: deals a new hand. <a> and <b> place the blinds (1000g)
-
+	
 	self.hand_complete = false
 	self.round  = "PREFLOP"
 	self.raises = 0
@@ -638,7 +648,7 @@ function RPPoker.Game:DealHand()
 	end
 	
 	if self:ActivePlayers() < 2 then
-		RPPoker:Print( "Not enough players for a new hand." )
+		Main:Print( "Not enough players for a new hand." )
 		return
 	end
 	
@@ -665,4 +675,21 @@ function RPPoker.Game:DealHand()
 	self:NextTurn()
 	
 	self:StartBettingRound( false )
+end
+
+-------------------------------------------------------------------------------
+-- Print a string.
+--
+-- @param text Text to print, may contain placeholders {1}, {2}, {3} etc which
+--             will be replaced with the extra arguments given.
+--
+-- @param ...  Text replacements.
+--
+function Main:Print( text, ... )
+	for i = 1, select( "#", ... ) do
+		local a = tostring(select( i, ... ))
+		text = string.gsub( key, "{" .. i .. "}", a )
+	end
+	
+	print( "|cffa9003b<RP Poker>|r " .. text )
 end
