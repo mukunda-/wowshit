@@ -9,6 +9,8 @@
 embeds.xml
 init.lua
 
+Widgets/widgets.xml
+
 config.lua
 
 RPPoker.lua

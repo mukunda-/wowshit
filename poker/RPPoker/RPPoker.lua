@@ -2,10 +2,12 @@ local Main = RPPoker
 
 -------------------------------------------------------------------------------
 Main.Game = {
-	players = {};
 
+	players = {};
+	
 	-- player, index is the seat number
-	--   name    player name
+	--   name    character name
+	--   alias   roleplay name
 	--   credit  money remaining
 	--   hand    two cards (hole)
 	--   rank    the rank of their hand, filled in at the showdown.
@@ -17,31 +19,31 @@ Main.Game = {
 
 -- nil assignments are just for documentation purpose
 
-	dealer      = nil;
+	dealer      = 1;
 --	button_icon = nil;
 --	turn_icon   = nil;
 
 -- TODO; copy these from config on game start
-	ante        = nil;
-	small_blind = nil;
-	big_blind   = nil;
-	multiplier  = nil; -- init to 1.0?
+	ante        = 0;
+	small_blind = 0;
+	big_blind   = 0;
+	multiplier  = 0; -- init to 1.0?
 
 	deck        = {};
 	state       = "SETUP"; -- "SETUP" - adding players
-                              -- "LIVE" - playing a game
+							  -- "LIVE" - playing a game
 
-	round          = nil; -- the round of the current hand, 
-					      -- may be "PREFLOP", "POSTFLOP", 
+	round          = ""; -- the round of the current hand, 
+						  -- may be "PREFLOP", "POSTFLOP", 
 						  -- "POSTTURN", "POSTRIVER" or "SHOWDOWN"
-	round_complete = nil; -- if the current betting round is complete
-	                      -- and waiting for confirmation to continue to
+	round_complete = false; -- if the current betting round is complete
+						  -- and waiting for confirmation to continue to
 						  -- the next round
 						  
 	hand_complete  = true; -- if all rounds in a hand are completed and
-	                       -- ready to start a new hand
+						   -- ready to start a new hand
  
-	turn = nil;            -- whose turn is it
+	turn = 1;            -- whose turn is it
 
 	pot  = 0;              -- total amount of credit in the pot (and side pots)
 	bet  = 0;              -- current bet
@@ -50,8 +52,21 @@ Main.Game = {
 						   -- capped by max_raises in config
 
 	table  = {};           -- community cards
+	
+	history = {};
+	redo    = {};
 }
 
+local state_keys = {
+	"players", "dealer", "ante", "small_blind",
+	"big_blind", "multiplier", "deck", "state",
+	"round", "round_complete", "hand_complete",
+	"turn", "pot", "bet", "raises", "table"
+}
+
+local NUM_HISTORY_ENTRIES = 10
+  
+-------------------------------------------------------------------------------
 Main.CARD_NAMES = { "Ace", "Two", "Three", "Four", "Five", "Six", "Seven", 
                        "Eight", "Nine", "Ten", "Jack", "Queen", "King" }
 Main.CARD_SUITS = { "Clubs", "Diamonds", "Hearts", "Spades" }
@@ -69,6 +84,84 @@ Main.RANKS = {
 	ONE_PAIR       = 1;
 	HIGH_CARD      = 0;
 }
+
+-------------------------------------------------------------------------------
+local function CopyTable( tbl )
+	local copy = {}
+	for k,v in pairs( tbl ) do 
+		if type(v) == "table" then
+			copy[k] = CopyTable(v)
+		else
+			copy[k] = v
+		end
+	end
+	return copy
+end
+
+-------------------------------------------------------------------------------
+function Main.Game:CopyState()
+
+    local copy = {}
+	
+	for k, v in pairs( state_keys ) do
+		if type(self[v]) == "table" then
+			copy[v] = CopyTable( self[v] )
+		else
+			copy[v] = self[v]
+		end
+	end
+	
+    return copy
+end
+
+-------------------------------------------------------------------------------
+function Main.Game:LoadState( state )
+	for k, v in pairs( state ) do
+		self[k] = v
+	end
+end
+
+-------------------------------------------------------------------------------
+function Main.Game:SaveState()
+	Main.Config.db.char.state = self:CopyState()
+end
+
+-------------------------------------------------------------------------------
+function Main.Game:PushHistory()
+	self.redo = {} -- reset redo stack
+	
+	table.insert( self.history, 1, self:CopyState() )
+	while self.history[NUM_HISTORY_ENTRIES+1] do
+		table.remove( self.history, NUM_HISTORY_ENTRIES+1 )
+	end
+end
+
+-------------------------------------------------------------------------------
+function Main.Game:Undo()
+	local state = self.history[1]
+	if not state then 
+		Main:Print( "Cannot undo further." )
+		return 
+	end
+	table.remove( self.history, 1 )
+	table.insert( self.redo, self:CopyState() )
+	LoadState( state )
+	Main.UI:UpdateAll()
+end
+
+-------------------------------------------------------------------------------
+function Main.Game:Redo()
+	local state = self.redo[1]
+	if not state then
+		Main:Print( "Cannot redo further." )
+		return
+	end
+	
+	table.remove( self.redo, 1 )
+	table.insert( self.history, 1, self:CopyState() )
+	LoadState( state )
+	Main.UI:UpdateAll()
+end
 
 -------------------------------------------------------------------------------
 -- Loads a new shuffled deck.
@@ -127,10 +220,11 @@ end
 -------------------------------------------------------------------------------
 -- Initialize a new player table.
 --
-function Main.Game:CreatePlayer( name, credit )
+function Main.Game:CreatePlayer( name, alias, credit )
 	return {
 		name   = name;
-		credit = credit;
+		alias  = alias or name;
+		credit = credit or 0;
 		hand   = {}; -- aka hole
 		folded = true;
 		allin  = false;
@@ -178,16 +272,27 @@ function Main.Game:SetTurn( index )
 end
 
 -------------------------------------------------------------------------------
+function Main.Game:GetPlayer( name )
+	for k,v in pairs(self.players) do
+		if v.name == name then return v end
+	end
+end
+
+-------------------------------------------------------------------------------
 -- Add a new player to the poker table.
 --
 -- @param name Name of player.
 --
-function Main.Game:AddPlayer( name, credit ) 
+function Main.Game:AddPlayer( name, alias, credit ) 
 	for k,v in pairs(self.players) do
 		if v.name == name then return end -- player already added
 	end
 	
-	table.insert( self.players, self:CreatePlayer(name, credit) )
+	Main.Game:PushHistory( "Add Player" )
+	
+	table.insert( self.players, self:CreatePlayer(name, alias, credit) )
+	
+	Main.Game:SaveState()
 end
 
 -------------------------------------------------------------------------------
@@ -622,6 +727,7 @@ end
 -- Start a new hand.
 --
 function Main.Game:DealHand()
+	self:PushHistory()
 	
 	-- emote: deals a new hand. <a> and <b> place the blinds (1000g)
 	
@@ -675,6 +781,8 @@ function Main.Game:DealHand()
 	self:NextTurn()
 	
 	self:StartBettingRound( false )
+	
+	self:SaveState()
 end
 
 -------------------------------------------------------------------------------
