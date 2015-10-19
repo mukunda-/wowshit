@@ -7,47 +7,29 @@ if not AceGUI or (AceGUI:GetWidgetVersion(Type) or 0) >= VERSION then return end
 local Main = RPPoker
 
 local g_menu = nil
-
-print( "LOADED POKER PLAYER WIDGET" )
-
-local function Control_OnClick(frame)
-	
-end
-
-local function Control_OnEnter(frame)
-	frame.hot:Show()
-end
-
-local function Control_OnLeave(frame)
-	frame.hot:Hide()
-end	
-
+local g_context = nil
 
 -------------------------------------------------------------------------------
-local methods = {
-	OnAcquire = function(self)
-		self:SetHeight( 24 ) 
-		self:SetFullWidth( true )
-	end;
-	
-	UpdateInfo = function( self, player )
-	
-		self.frame.text_name:SetText( player.alias )
-		self.frame.text_gold:SetText( "Credit: " .. player.credit .. " |TInterface/MONEYFRAME/UI-GoldIcon:0|t" )
-		
-		if Main.Game:CurrentPlayer() == player then
-			self.frame.turn:Show()
-		else
-			self.frame.turn:Hide()
-		end
-		
-	end;
-}
-
 local function Menu_RemovePlayer()
+	local player = g_context.player
 	
+	local data = Main.Game:GetPlayer( player )
+	if not data then return end
+	
+	Main.UI:ConfirmAction( 
+		"Remove player: " .. player .. "/" .. data.alias .. "?", 
+		function() 
+			Main.Game:RemovePlayer( player )
+			Main.UI:Update()
+		end )
 end
 
+-------------------------------------------------------------------------------
+local function Menu_AdjustCredit()
+	Main.UI:AdjustCredit( g_context.player )
+end
+
+-------------------------------------------------------------------------------
 local function InitializeMenu()
 	local info
 	
@@ -67,21 +49,19 @@ local function InitializeMenu()
 	end
 
 	info = UIDropDownMenu_CreateInfo()
-	info.text    = "Player Actions:"
+	info.text    = g_context.player
 	info.isTitle = true
 	info.notCheckable = true
 	UIDropDownMenu_AddButton( info, level )
 
+	
+	AddSeparator()
+	AddMenuButton( "Adjust Credit", Menu_AdjustCredit )
+	 
+	AddSeparator()
+	 
+	
 	AddMenuButton( "Remove Player", Menu_RemovePlayer )
-	
-	AddSeparator()
-	
-	AddMenuButton( L["Show Versions"], function() Delleren:WhoCommand() end )
-	AddMenuButton( L["Open Configuration"], function() Delleren.Config:Open() end )
-	
-	AddSeparator()
-	
-	AddMenuButton( L["Close"], function() end )
 end
 
 -------------------------------------------------------------------------------
@@ -91,7 +71,7 @@ local function ShowMenu()
 		                      UIParent, "UIDropDownMenuTemplate" )
 		g_menu.displayMode = "MENU"
 	end
-	 
+	  
 	UIDropDownMenu_Initialize( PokerStatusMenu, InitializeMenu )
 	UIDropDownMenu_SetWidth( PokerStatusMenu, 100 )
 	UIDropDownMenu_SetButtonWidth( PokerStatusMenu, 124 ) 
@@ -103,11 +83,54 @@ local function ShowMenu()
 end
 
 -------------------------------------------------------------------------------
+local function Control_OnEnter(frame)
+	frame.hot:Show()
+end
+
+-------------------------------------------------------------------------------
+local function Control_OnLeave(frame)
+	frame.hot:Hide()
+end	
+
+-------------------------------------------------------------------------------
+local function Control_OnClick( frame, button )
+
+	if button == "RightButton" then
+		g_context = frame.obj
+		ShowMenu()
+	end
+end
+ 
+-------------------------------------------------------------------------------
+local methods = {
+	OnAcquire = function(self)
+		self:SetHeight( 24 ) 
+		self:SetFullWidth( true )
+	end;
+	
+	UpdateInfo = function( self, player )
+	
+		self.player = player.name
+		self.frame.text_name:SetText( player.alias )
+		self.frame.text_gold:SetText( "Credit: " .. player.credit .. " |TInterface/MONEYFRAME/UI-GoldIcon:0|t" )
+		
+		if Main.Game:CurrentPlayer() == player then
+			self.frame.turn:Show()
+		else
+			self.frame.turn:Hide()
+		end
+		
+	end;
+}
+
+
+-------------------------------------------------------------------------------
 local function Constructor()
 	local name = "PokerPlayerStatus" .. AceGUI:GetNextWidgetNum( TYPE )
-	local frame = CreateFrame( "Frame", name, UIParent )
+	local frame = CreateFrame( "Button", name, UIParent )
 	frame:Hide()
 	frame:EnableMouse(true)
+	frame:RegisterForClicks( "RightButtonUp" )
 	
 	local hot = frame:CreateTexture( nil, "BACKGROUND" )
 	frame.hot = hot
@@ -133,14 +156,17 @@ local function Constructor()
 	text:SetFont( "Fonts\\ARIALN.TTF", 12 )
 	text:SetPoint( "LEFT", 150, 0 ) 
 	frame.text_gold = text
-	
-	
+	 
 	frame:SetScript( "OnEnter", Control_OnEnter )
 	frame:SetScript( "OnLeave", Control_OnLeave )
+	frame:SetScript( "OnClick", Control_OnClick )
+	 
 	
 	local widget = {
 		frame = frame;
 		type  = TYPE;	
+		
+		player = "";
 	}
 	
 	for method, func in pairs(methods) do

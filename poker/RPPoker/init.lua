@@ -11,12 +11,12 @@ Main.version = VERSION
 function Main:OnInitialize()
 	self.Config:InitDB()
 	if self.Config.db.char.state then
-		Main.Game:LoadState( self.Config.db.char.state )
+	--	Main.Game:LoadState( self.Config.db.char.state )
 	end
 	
 	self.UI:Init()
 end
 
 function Main:OnEnable()
-	self.UI:UpdateAll()
+	self.UI:Update()
 end

@@ -53,6 +53,8 @@ Main.Game = {
 
 	table  = {};           -- community cards
 	
+	history_note = "";
+	
 	history = {};
 	redo    = {};
 }
@@ -61,10 +63,12 @@ local state_keys = {
 	"players", "dealer", "ante", "small_blind",
 	"big_blind", "multiplier", "deck", "state",
 	"round", "round_complete", "hand_complete",
-	"turn", "pot", "bet", "raises", "table"
+	"turn", "pot", "bet", "raises", "table",
+	"history_note"
 }
 
 local NUM_HISTORY_ENTRIES = 10
+local GOLD_ICON = "|TInterface/MONEYFRAME/UI-GoldIcon:0|t"
   
 -------------------------------------------------------------------------------
 Main.CARD_NAMES = { "Ace", "Two", "Three", "Four", "Five", "Six", "Seven", 
@@ -127,10 +131,12 @@ function Main.Game:SaveState()
 end
 
 -------------------------------------------------------------------------------
-function Main.Game:PushHistory()
+function Main.Game:PushHistory( note )
 	self.redo = {} -- reset redo stack
 	
-	table.insert( self.history, 1, self:CopyState() )
+	self.history_note = note
+	table.insert( self.history, 1, self:CopyState() ) 
+	
 	while self.history[NUM_HISTORY_ENTRIES+1] do
 		table.remove( self.history, NUM_HISTORY_ENTRIES+1 )
 	end
@@ -144,9 +150,11 @@ function Main.Game:Undo()
 		return 
 	end
 	table.remove( self.history, 1 )
-	table.insert( self.redo, self:CopyState() )
-	LoadState( state )
-	Main.UI:UpdateAll()
+	table.insert( self.redo, 1, self:CopyState() )
+	self:LoadState( state )
+	Main.UI:Update()
+	
+	Main:Print( "Undid: " .. self.history_note )
 end
 
 -------------------------------------------------------------------------------
@@ -157,10 +165,12 @@ function Main.Game:Redo()
 		return
 	end
 	
+	Main:Print( "Redid: " .. self.history_note )
 	table.remove( self.redo, 1 )
 	table.insert( self.history, 1, self:CopyState() )
-	LoadState( state )
-	Main.UI:UpdateAll()
+	self:LoadState( state )
+	Main.UI:Update()
+	
 end
 
 -------------------------------------------------------------------------------
@@ -292,6 +302,9 @@ function Main.Game:AddPlayer( name, alias, credit )
 	
 	table.insert( self.players, self:CreatePlayer(name, alias, credit) )
 	
+	Main:Print( "Added player: " .. alias .. " (" .. name .. ")"
+                .. " Credit: " .. credit .. GOLD_ICON )
+	
 	Main.Game:SaveState()
 end
 
@@ -303,7 +316,9 @@ end
 function Main.Game:RemovePlayer( name )
 	for k,v in pairs(self.players) do
 		if v.name == name then 
+			Main.Game:PushHistory( "Remove Player" )
 			table.remove( self.players, k ) 
+			Main.Game:SaveState()
 			return
 		end
 	end
@@ -421,10 +436,13 @@ end
 -- Ante up for all players.
 --
 function Main.Game:PlayerAnteUp()
-	for _,p in pairs(self.players) do
-	
-		if not p.folded then
-			AddBet( p, self.ante )
+
+	if self.ante > 0 then
+		for _,p in pairs(self.players) do
+		
+			if not p.folded then
+				AddBet( p, self.ante )
+			end
 		end
 	end
 end
@@ -453,7 +471,7 @@ function Main.Game:AnnounceTurn()
 	local actions = ""
 	--local text = string.format( "%s's turn. Actions: 
 end
-
+ 
 -------------------------------------------------------------------------------
 function Main.Game:PartyPrint( text )
 	local channel
@@ -520,6 +538,12 @@ end
 --
 function Main.Game:PlayerCheck()
 	local p = self:CurrentPlayer()
+	assert( not p.folded )
+	
+	if self.round_complete then	
+		Main:Print( "The round has ended." )
+		return
+	end	
 	
 	if self:CallAmount(p) ~= 0 then
 		Main:Print( "Check not allowed." )
@@ -538,14 +562,20 @@ end
 --
 function Main.Game:PlayerBet( amount )
 	local p = self:CurrentPlayer()
+	assert( not p.folded )
+	
+	if self.round_complete then	
+		Main:Print( "The round has ended." )
+		return
+	end	
 	
 	if self:CallAmount(p) ~= 0 then
-		print( "Player must raise, not bet." )
+		Main:Print( "Player must raise, not bet." )
 		return
 	end
 	
 	if amount < self.big_blind then
-		print( "Must bet at least the big blind amount." )
+		Main:Print( "Must bet at least the big blind amount." )
 		return
 	end
 	
@@ -563,6 +593,12 @@ end
 --
 function Main.Game:PlayerRaise( amount )
 	local p = self:CurrentPlayer()
+	assert( not p.folded )
+	
+	if self.round_complete then	
+		Main:Print( "The round has ended." )
+		return
+	end	
 	
 	if self.raises >= self.max_raises then
 		Main:Print( "Cannot raise higher." )
@@ -594,6 +630,11 @@ function Main.Game:PlayerFold()
 	local p = self:CurrentPlayer()
 	assert( not p.folded )
 	
+	if self.round_complete then	
+		Main:Print( "The round has ended." )
+		return
+	end	
+	
 	p.folded = true
 	self:ContinueBettingRound()
 end
@@ -604,6 +645,11 @@ end
 function Main.Game:PlayerAllIn()
 	local p = self:CurrentPlayer()
 	assert( not p.folded )
+	
+	if self.round_complete then	
+		Main:Print( "The round has ended." )
+		return
+	end	
 	
 	if p.credit > self:CallAmount(p) then
 		local raise = p.credit - self:CallAmount(p)
@@ -727,7 +773,7 @@ end
 -- Start a new hand.
 --
 function Main.Game:DealHand()
-	self:PushHistory()
+	self:PushHistory( "Deal Hand" )
 	
 	-- emote: deals a new hand. <a> and <b> place the blinds (1000g)
 	
@@ -786,6 +832,45 @@ function Main.Game:DealHand()
 end
 
 -------------------------------------------------------------------------------
+-- Adjust a player's credit.
+--
+-- @param player Name of player.
+-- @param amount Amount to add (may be negative).
+function Main.Game:AdjustCredit( player, amount )
+	local p = self:GetPlayer( player )
+	if not p then return end
+	
+	self:PushHistory( "Adjust Credit" )
+	
+	local old = p.credit
+	
+	p.credit = p.credit + amount
+	
+	Main:Print( "Adjusting credit - " .. p.alias 
+				.. " Old: " .. old .. GOLD_ICON
+				.. " New: " .. p.credit .. GOLD_ICON )
+	
+	self:SaveState()
+	
+	Main.UI:UpdatePlayerStatus()
+end
+
+-------------------------------------------------------------------------------
+-- Format a player string.
+--
+-- Returns "name" / "alias" or nil if the player doesn't exist.
+--
+-- @param player Name of player.
+--
+function Main.Game:GetPlayerString( player )
+	local p = self:GetPlayer( player )
+	if not p then return end
+	
+	if p.alias == p.name then return p.name end
+	return p.name .. " / " .. p.alias
+end
+
+-------------------------------------------------------------------------------
 -- Print a string.
 --
 -- @param text Text to print, may contain placeholders {1}, {2}, {3} etc which
@@ -801,3 +886,4 @@ function Main:Print( text, ... )
 	
 	print( "|cffa9003b<RP Poker>|r " .. text )
 end
+
