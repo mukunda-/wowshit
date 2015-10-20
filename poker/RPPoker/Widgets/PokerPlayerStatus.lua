@@ -30,6 +30,11 @@ local function Menu_AdjustCredit()
 end
 
 -------------------------------------------------------------------------------
+local function Menu_ToggleBreak()
+	Main.Game:TogglePlayerBreak( g_context.player )
+end
+
+-------------------------------------------------------------------------------
 local function InitializeMenu()
 	local info
 	
@@ -55,6 +60,7 @@ local function InitializeMenu()
 	UIDropDownMenu_AddButton( info, level )
 
 	
+	AddMenuButton( "Toggle Break", Menu_ToggleBreak )
 	AddSeparator()
 	AddMenuButton( "Adjust Credit", Menu_AdjustCredit )
 	 
@@ -111,14 +117,42 @@ local methods = {
 	UpdateInfo = function( self, player )
 	
 		self.player = player.name
-		self.frame.text_name:SetText( player.alias )
-		self.frame.text_gold:SetText( "Credit: " .. player.credit .. " |TInterface/MONEYFRAME/UI-GoldIcon:0|t" )
 		
-		if Main.Game:CurrentPlayer() == player then
-			self.frame.turn:Show()
-		else
-			self.frame.turn:Hide()
+		local nametext = player.alias
+		if not player.active then
+			nametext = "(B) " .. nametext
 		end
+		
+		self.frame.text_name:SetText( nametext )
+		self.frame.text_gold:SetText( "Credit: " .. player.credit .. " |TInterface/MONEYFRAME/UI-GoldIcon:0|t" )
+		self.frame.text_bet:SetText( "Bet: " .. player.pot .. " |TInterface/MONEYFRAME/UI-GoldIcon:0|t" )
+		
+		if Main.Game.hand_complete then
+			self.frame.turn:Hide()
+			
+			self.frame.text_status:SetText( "" )
+		else
+			if Main.Game:CurrentPlayer() == player then
+				self.frame.turn:Show()
+			else
+				self.frame.turn:Hide()
+			end
+			
+			if player.folded then
+				if player.pot == 0 then
+					self.frame.text_status:SetText( "FOLDED" )
+				else
+					self.frame.text_status:SetText( "BREAK" )
+				end
+			elseif player.allin then
+				self.frame.text_status:SetText( "ALL-IN" )
+			elseif player.acted then
+				self.frame.text_status:SetText( "ACTED" )
+			else
+				self.frame.text_status:SetText( "" )
+			end
+		end
+		
 		
 	end;
 }
@@ -156,6 +190,16 @@ local function Constructor()
 	text:SetFont( "Fonts\\ARIALN.TTF", 12 )
 	text:SetPoint( "LEFT", 150, 0 ) 
 	frame.text_gold = text
+	
+	local text = frame:CreateFontString()
+	text:SetFont( "Fonts\\ARIALN.TTF", 12 )
+	text:SetPoint( "LEFT", 300, 0 ) 
+	frame.text_bet = text
+	
+	local text = frame:CreateFontString()
+	text:SetFont( "Fonts\\ARIALN.TTF", 12 )
+	text:SetPoint( "LEFT", 450, 0 ) 
+	frame.text_status = text
 	 
 	frame:SetScript( "OnEnter", Control_OnEnter )
 	frame:SetScript( "OnLeave", Control_OnLeave )

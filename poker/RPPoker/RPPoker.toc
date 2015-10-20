@@ -16,3 +16,4 @@ config.lua
 RPPoker.lua
 ui.lua
 handrank.lua
+emotes.lua

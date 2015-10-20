@@ -29,11 +29,13 @@ function Main.UI:Init()
 	button:SetText( "Undo" )
 	button:SetCallback( "OnClick", self.UndoClicked )
 	f:AddChild( button ) 
+	self.undo_button = button
 	
 	local button = AceGUI:Create( "Button" )
 	button:SetText( "Redo" )
 	button:SetCallback( "OnClick", self.RedoClicked )
 	f:AddChild( button ) 
+	self.redo_button = button
 	
 	self.pactions = {}
 	
@@ -79,7 +81,14 @@ function Main.UI:Init()
 	e:SetWidth( 120 )
 	e:SetCallback( "OnClick", self.PlayerActionAllIn )
 	playeractions:AddChild( e )
-	self.pactions.alllin = e
+	self.pactions.allin = e
+	
+	
+	e = AceGUI:Create( "Button" )
+	e:SetText( "Next Round" )
+	e:SetCallback( "OnClick", self.NextRoundClicked )
+	f:AddChild( e )
+	self.nextround = e
 	
 	self.frame = f
 	 
@@ -176,9 +185,9 @@ function Main.UI:ShowAddPlayer( name )
 				return
 			end
 			
-			credit =math.floor( credit )
+			credit = math.floor( credit )
 			
-			Main.Game:AddPlayer( name, alias, credit )
+			Main.Game:AddPlayer( data.playername, alias, credit )
 			self:UpdatePlayerStatus()
 			
 			f:Hide() 
@@ -190,6 +199,7 @@ function Main.UI:ShowAddPlayer( name )
 		alias_default = TRP3_API.r.name( name )
 	end
 	
+	self.addplayer.playername = name
 	self.addplayer.name:SetText( name )
 	self.addplayer.alias:SetText( alias_default )
 	self.addplayer.credit:SetText( 0 )
@@ -317,21 +327,114 @@ end
 -------------------------------------------------------------------------------
 function Main.UI:Update()
 	self:UpdatePlayerStatus()
+	
+	self.undo_button:SetDisabled( not Main.Game.history[1] )
+	self.redo_button:SetDisabled( not Main.Game.redo[1] )
+	
+	if not Main.Game.round_complete and Main.Game.round ~= "SHOWDOWN" then
+	
+		self.pactions.call:SetDisabled( false )
+		local p = Main.Game:CurrentPlayer()
+		local ca = Main.Game:CallAmount(p)
+		
+		if ca == 0 then
+			self.pactions.call:SetText( "Check" )
+			self.pactions.bet:SetText( "Bet" )
+		else
+			
+			self.pactions.call:SetText( "Call" )
+			self.pactions.bet:SetText( "Raise" )
+			
+			if p.credit < ca then
+				self.pactions.call:SetDisabled( true )
+			end
+			
+			if p.credit <= ca then
+				self.pactions.bet:SetDisabled( true )
+			end
+		end
+		
+		self.pactions.fold:SetDisabled( false )
+		self.pactions.allin:SetDisabled( false )
+	else
+		self.pactions.call:SetDisabled( true )
+		self.pactions.bet:SetDisabled( true )
+		self.pactions.betamt:SetDisabled( true )
+		self.pactions.fold:SetDisabled( true )
+		self.pactions.allin:SetDisabled( true )
+	end
+	self.pactions.betamt:SetText("")
+	
+	if not Main.Game.round_complete then
+		self.nextround:SetText( "Round in progress." )
+		self.nextround:SetDisabled( true )
+	else
+		self.nextround:SetDisabled( false )
+		if Main.Game.hand_complete and Main.Game.round ~= "" then
+			self.nextround:SetText( "End Hand" )
+		else
+			if Main.Game.round == "" then
+				self.nextround:SetText( "Deal" )
+			elseif Main.Game.round == "PREFLOP" then
+				self.nextround:SetText( "Deal Flop" )
+			elseif Main.Game.round == "POSTFLOP" then
+				self.nextround:SetText( "Deal Turn" )
+			elseif Main.Game.round == "POSTTURN" then
+				self.nextround:SetText( "Deal River" )
+			elseif Main.Game.round == "POSTRIVER" then
+				self.nextround:SetText( "Showdown" )
+			end
+		end
+	end
+	
+	self.frame:SetStatusText( "ROUND: " .. Main.Game.round )
 end
 
-function Main.UI.PlayerActionBet()
-
-end
-
+-------------------------------------------------------------------------------
 function Main.UI.PlayerActionCall()
-
+	local p = Main.Game:CurrentPlayer()
+	if Main.Game:CallAmount(p) == 0 then
+		Main.Game:PlayerCheck()
+	else
+		Main.Game:PlayerCall()
+	end
 end
 
+-------------------------------------------------------------------------------
+function Main.UI.PlayerActionBet()
+	local p = Main.Game:CurrentPlayer()
+	local amt = tonumber(self.pactions.betamt)
+	
+	if not amt or amt <= 0 then
+		Main:Print( "Invalid bet amount." )
+	end
+	
+	if Main.Game:CallAmount(p) == 0 then
+		Main.Game:PlayerBet( amt )
+	else
+		Main.Game:PlayerRaise( amt )
+	end
+end
+
+-------------------------------------------------------------------------------
 function Main.UI.PlayerActionFold()
-
+	Main.Game:PlayerFold()
 end
 
+-------------------------------------------------------------------------------
 function Main.UI.PlayerActionAllIn()
-
+	Main.Game:PlayerAllIn()
 end
 
+function Main.UI.NextRoundClicked()
+	if Main.Game.hand_complete and Main.Game.round ~= "" then
+		Main.Game:EndHand()
+	else
+		if Main.Game.round == "" then
+			Main.Game:DealHand()
+		else
+			Main.Game:NextRound()
+		end
+	end
+	
+end

@@ -1,3 +1,5 @@
+local Main = RPPoker
+
 -- hand ranking computer
 
 -- note that all computation functions should be made to handle 
@@ -51,9 +53,9 @@ local function StraightFlush( cards )
 	if highest ~= 0 then
 		if highest == 14 then
 			-- ace high is a royal flush.
-			return EncodeRank( RPPoker.RANKS.ROYAL_FLUSH )
+			return EncodeRank( Main.RANKS.ROYAL_FLUSH )
 		end
-		return EncodeRank( RPPoker.RANKS.STRAIGHT_FLUSH, highest )
+		return EncodeRank( Main.RANKS.STRAIGHT_FLUSH, highest )
 	end
 	
 	return nil
@@ -89,7 +91,7 @@ local function FourKind( cards )
 			kicker = cards2[#cards2]
 		end
 		
-		return EncodeRank( RPPoker.RANKS.FOUR_KIND, found, kicker )
+		return EncodeRank( Main.RANKS.FOUR_KIND, found, kicker )
 	end
 	
 	return nil
@@ -120,7 +122,7 @@ local function FullHouse( cards )
 			if v2 ~= v then
 				-- both tables are sorted so this
 				-- is the highest combo found
-				return EncodeRank( RPPoker.RANKS.FULL_HOUSE, v, v2 )
+				return EncodeRank( Main.RANKS.FULL_HOUSE, v, v2 )
 			end
 		end
 	end
@@ -152,7 +154,7 @@ local function Flush( cards )
 	
 	if value ~= 0 then
 		
-		return EncodeRank( RPPoker.RANKS.FLUSH, value )
+		return EncodeRank( Main.RANKS.FLUSH, value )
 	end
 	
 	return nil
@@ -191,7 +193,7 @@ local function Straight( cards )
 	end
 	
 	if highest ~= 0 then
-		return EncodeRank( RPPoker.RANKS.STRAIGHT, highest )
+		return EncodeRank( Main.RANKS.STRAIGHT, highest )
 	end
 	
 	return nil
@@ -224,7 +226,7 @@ local function ThreeKind( cards )
 	if value ~= 0 then
 		kickers[1] = cards2[1] or 0
 		kickers[2] = cards2[2] or 0
-		return EncodeRank( RPPoker.RANKS.THREE_KIND, kickers[1], kickers[2] )
+		return EncodeRank( Main.RANKS.THREE_KIND, kickers[1], kickers[2] )
 	end
 end
 
@@ -258,7 +260,7 @@ local function TwoPairs( cards )
 	
 	if #found == 2 then
 		kicker = cards2[1] or 0
-		return EncodeRank( RPPoker.RANKS.TWO_PAIR, 
+		return EncodeRank( Main.RANKS.TWO_PAIR, 
 		                   found[1], found[2], cards2[1] or 0 )
 	end
 end
@@ -284,7 +286,7 @@ local function OnePair( cards )
 	end
 	
 	if found ~= 0 then
-		return EncodeRank( RPPoker.RANKS.ONE_PAIR, found, 
+		return EncodeRank( Main.RANKS.ONE_PAIR, found, 
 		                   cards2[1] or 0, cards2[2] or 0, cards2[3] or 0 )
 	end
 end
@@ -298,7 +300,7 @@ local function HighCard( cards )
 	end
 	table.sort( cards2, ReverseTableSort )
 	
-	return EncodeRank( RPPoker.RANKS.HIGH_CARD, 
+	return EncodeRank( Main.RANKS.HIGH_CARD, 
 	                   cards2[1] or 0, cards2[2] or 0, 
 	                   cards2[3] or 0, cards2[4] or 0,
 					   cards2[5] or 0 )
@@ -310,7 +312,7 @@ end
 -- @param cards One or more cards to compute the rank from. It will pick
 --              the five most-valued cards to produce the rank value.
 --
-function RPPoker:ComputeHandRank( cards )
+function Main:ComputeHandRank( cards )
 	
 	return StraightFlush(cards)
 		   or FourKind(cards)  or FullHouse(cards)
@@ -324,7 +326,7 @@ end
 --
 -- @param player Reference to player in game players table.
 --
-function RPPoker:UpdatePlayerRank( player )
+function Main:UpdatePlayerRank( player )
 
 	-- cards is table cards and player cards combined
 	local cards = {}

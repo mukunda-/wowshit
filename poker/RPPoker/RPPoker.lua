@@ -2,7 +2,12 @@ local Main = RPPoker
 
 -------------------------------------------------------------------------------
 Main.Game = {
+ 
+	history = {};
+	redo    = {};
+}
 
+local DEFAULT_STATE = {
 	players = {};
 	
 	-- player, index is the seat number
@@ -30,13 +35,11 @@ Main.Game = {
 	multiplier  = 0; -- init to 1.0?
 
 	deck        = {};
-	state       = "SETUP"; -- "SETUP" - adding players
-							  -- "LIVE" - playing a game
 
 	round          = ""; -- the round of the current hand, 
 						  -- may be "PREFLOP", "POSTFLOP", 
 						  -- "POSTTURN", "POSTRIVER" or "SHOWDOWN"
-	round_complete = false; -- if the current betting round is complete
+	round_complete = true; -- if the current betting round is complete
 						  -- and waiting for confirmation to continue to
 						  -- the next round
 						  
@@ -54,11 +57,18 @@ Main.Game = {
 	table  = {};           -- community cards
 	
 	history_note = "";
-	
-	history = {};
-	redo    = {};
 }
 
+-------------------------------------------------------------------------------
+function Main.Game:LoadState( state )
+	for k, v in pairs( state ) do
+		self[k] = v
+	end
+end
+
+Main.Game:LoadState( DEFAULT_STATE )
+
+-------------------------------------------------------------------------------
 local state_keys = {
 	"players", "dealer", "ante", "small_blind",
 	"big_blind", "multiplier", "deck", "state",
@@ -118,12 +128,6 @@ function Main.Game:CopyState()
     return copy
 end
 
--------------------------------------------------------------------------------
-function Main.Game:LoadState( state )
-	for k, v in pairs( state ) do
-		self[k] = v
-	end
-end
 
 -------------------------------------------------------------------------------
 function Main.Game:SaveState()
@@ -181,16 +185,16 @@ function Main.Game:NewDeck()
 	
 	-- insert 52 cards.
 	for i = 1,52 do
-		table.insert( g_deck, i )
+		table.insert( self.deck, i )
 	end
 	
 	-- shuffle
 	for i = 52,2,-1 do
 		local j = math.random( 1, i )
-		local k = g_deck[i]
+		local k = self.deck[i]
 		
-		g_deck[i] = g_deck[j]
-		g_deck[j] = k
+		self.deck[i] = self.deck[j]
+		self.deck[j] = k
 	end
 end
 
@@ -224,7 +228,7 @@ function Main.Game:DealCard( player )
 	
 	if p.folded then return false end -- (player is taking a break.)
 	
- 	table.insert( p.hand, DrawCard() )
+ 	table.insert( p.hand, self:DrawCard() )
 end
 
 -------------------------------------------------------------------------------
@@ -243,6 +247,16 @@ function Main.Game:CreatePlayer( name, alias, credit )
 		pot    = 0;
 		active = true;
 	}
+end
+
+-------------------------------------------------------------------------------
+function Main.Game:TogglePlayerBreak( name )
+	local p = self:GetPlayer(name)
+	if not p then return end
+	p.active = not p.active
+	
+	Main.UI:UpdatePlayerStatus()
+	self:SaveState()
 end
 
 -------------------------------------------------------------------------------
@@ -294,10 +308,11 @@ end
 -- @param name Name of player.
 --
 function Main.Game:AddPlayer( name, alias, credit ) 
+
 	for k,v in pairs(self.players) do
 		if v.name == name then return end -- player already added
 	end
-	
+
 	Main.Game:PushHistory( "Add Player" )
 	
 	table.insert( self.players, self:CreatePlayer(name, alias, credit) )
@@ -318,10 +333,13 @@ function Main.Game:RemovePlayer( name )
 		if v.name == name then 
 			Main.Game:PushHistory( "Remove Player" )
 			table.remove( self.players, k ) 
+			Main:Print( "Removed player: " .. v.alias .. " (" .. name .. ")"
+                .. " Credit: " .. v.credit .. GOLD_ICON )
 			Main.Game:SaveState()
 			return
 		end
 	end
+	
 end
 
 -------------------------------------------------------------------------------
@@ -343,9 +361,9 @@ end
 -- Returns the name of a card.
 --
 function Main.Game:CardName( card )
-	local number, suit = CardValue( card )
+	local number, suit = self:CardValue( card )
 	
-	return self.CARD_NAMES[number] .. " of " .. self.CARD_SUITS[suit]
+	return Main.CARD_NAMES[number] .. " of " .. Main.CARD_SUITS[suit]
 end
 
 -------------------------------------------------------------------------------
@@ -374,12 +392,15 @@ end
 --
 function Main.Game:TellCards( player )
 	
-	local msg = string.format( "Your cards: %s, %s. Credit: %dg",
-							   self:CardName( p.hand[1] ), 
-							   self:CardName( p.hand[2] ),
-							   p.credit )
+	print( "tellcards", player.name, player.hand[1], player.hand[2] )
+	local msg = string.format( "<EP> Your cards: %s, %s. Credit: %dg",
+							   self:CardName( player.hand[1] ), 
+							   self:CardName( player.hand[2] ),
+							   player.credit )
 	
 	SendChatMessage( msg, "WHISPER", _, player.name )
+	--self:SendChatMessage( msg, "WHISPER", player.name )
+	
 end
 
 -------------------------------------------------------------------------------
@@ -424,10 +445,10 @@ function Main.Game:PlayerDealCards()
 	
 	for i = 1,#self.players*2 do
 		x = x + 1
-		if x >= #self.players then x = 1 end
+		if x > #self.players then x = 1 end
 		
 		if not self.players[x].folded then
-			DealCard( self.players[x] )
+			self:DealCard( self.players[x] )
 		end
 	end
 end
@@ -451,8 +472,8 @@ end
 -- Bet the small blind.
 --
 function Main.Game:PlayerBetSmallBlind()
-	local p = CurrentPlayer()
-	AddBet( CurrentPlayer(), self.small_blind )
+	local p = self:CurrentPlayer()
+	self:AddBet( self:CurrentPlayer(), self.small_blind )
 end
 
 -------------------------------------------------------------------------------
@@ -460,29 +481,16 @@ end
 --
 function Main.Game:PlayerBetBigBlind()
 	
-	local p = CurrentPlayer()
-	AddBet( CurrentPlayer(), self.big_blind )
+	local p = self:CurrentPlayer()
+	self:AddBet( self:CurrentPlayer(), self.big_blind )
 end
 
 -------------------------------------------------------------------------------
 function Main.Game:AnnounceTurn()
-	local p = CurrentPlayer()
+	local p = self:CurrentPlayer()
 	
 	local actions = ""
 	--local text = string.format( "%s's turn. Actions: 
-end
- 
--------------------------------------------------------------------------------
-function Main.Game:PartyPrint( text )
-	local channel
-	
-	if IsInRaid() then
-		channel = "RAID"
-	else
-		channel = "PARTY"
-	end
-	
-	SendChatMessage( text, channel )
 end
 
 -------------------------------------------------------------------------------
@@ -522,15 +530,25 @@ end
 function Main.Game:PlayerCall()
 	local p = self:CurrentPlayer()
 	
+	if self:CallAmount(p) == 0 then
+		Main:Print( "Player must check, not call." )
+		return
+	end
+	
 	if p.credit < self:CallAmount(p) then
 		Main:Print( "Insufficient credit." )
 		return
 	end
 	
+	self:PushHistory( "Player Call" )
+	
 	p.acted = true
 	AddBet( p, self.bet - self.bet )
 	
 	self:ContinueBettingRound()
+	
+	self:SaveState()
+	Main.UI:Update()
 end
 
 -------------------------------------------------------------------------------
@@ -550,9 +568,14 @@ function Main.Game:PlayerCheck()
 		return
 	end
 	
+	self:PushHistory( "Player Check" )
+	
 	p.acted = true
 	
 	self:ContinueBettingRound()
+	
+	self:SaveState()
+	Main.UI:Update()
 end
 
 -------------------------------------------------------------------------------
@@ -579,11 +602,16 @@ function Main.Game:PlayerBet( amount )
 		return
 	end
 	
+	self:PushHistory( "Player Bet" )
+	
 	self:ResetActed()
 	p.acted = true
 	self:AddBet( amount )
 	
 	self:ContinueBettingRound()
+	
+	self:SaveState()
+	Main.UI:Update()
 end
 
 -------------------------------------------------------------------------------
@@ -616,11 +644,16 @@ function Main.Game:PlayerRaise( amount )
 		return
 	end
 	
+	self:PushHistory( "Player Raise" )
+	
 	self:ResetActed()
 	p.acted = true
 	self:AddBet( p, amount )
 	
 	self:ContinueBettingRound()
+	
+	self:SaveState()
+	Main.UI:Update()
 end
 
 -------------------------------------------------------------------------------
@@ -635,8 +668,13 @@ function Main.Game:PlayerFold()
 		return
 	end	
 	
+	self:PushHistory( "Player Fold" )
+	
 	p.folded = true
 	self:ContinueBettingRound()
+	
+	self:SaveState()
+	Main.UI:Update()
 end
 
 -------------------------------------------------------------------------------
@@ -651,6 +689,8 @@ function Main.Game:PlayerAllIn()
 		return
 	end	
 	
+	self:PushHistory( "Player All-In" )
+	
 	if p.credit > self:CallAmount(p) then
 		local raise = p.credit - self:CallAmount(p)
 		
@@ -664,6 +704,9 @@ function Main.Game:PlayerAllIn()
 	p.acted = true
 	
 	self:ContinueBettingRound()
+	
+	self:SaveState()
+	Main.UI:Update()
 end
 
 -------------------------------------------------------------------------------
@@ -673,7 +716,7 @@ function Main.Game:FindNextPlayer( index )
 	
 	for i = 1,#self.players do
 		index = index + 1
-		if index >= #self.players then index = 1 end
+		if index > #self.players then index = 1 end
 		if not self.players[index].folded then
 			break
 		end
@@ -706,6 +749,7 @@ function Main.Game:StartBettingRound( reset_pos )
 		self:SetTurn(t)
 	end
 	
+	self:ResetActed()
 	self:ContinueBettingRound()
 end
 
@@ -714,11 +758,11 @@ function Main.Game:ContinueBettingRound()
 
 	if self:ActivePlayers() == 1 then
 		-- everyone else folded.
-		self:EndHand()
+		self.round_complete = true 
 		return
 	end
 	
-	self:CheckPots()
+	
 	
 	-- find next turn
 	while( not self:AllPlayersActed() ) do
@@ -736,10 +780,112 @@ function Main.Game:ContinueBettingRound()
 end
 
 -------------------------------------------------------------------------------
+function Main.Game:DealFlop()
+	assert( self.round == "PREFLOP" and self:AllPlayersActed() )
+	
+	self:PushHistory( "Deal Flop" )
+	self:DrawCard() -- burn
+	
+	self.round = "POSTFLOP"
+	for i = 1,3 do table.insert( self.table, self:DrawCard() ) end
+	self:StartBettingRound( true )
+	
+	
+	Main:Emote( "FLOP", self:CardName( self.table[1] ),
+						self:CardName( self.table[2] ), 
+						self:CardName( self.table[3] ) )
+						
+	Main:PartyPrint( "**FLOP DEALT**" )
+	self:PrintTableCards()
+	
+	self:SaveState()
+	Main.UI:Update()
+end
+
+-------------------------------------------------------------------------------
+function Main.Game:DealTurn()
+	assert( self.round == "POSTFLOP" and self:AllPlayersActed() )
+	
+	self:PushHistory( "Deal Turn" )
+	self:DrawCard() -- burn and turn
+	
+	self.round = "POSTTURN"
+	table.insert( self.table, self:DrawCard() )
+	self:StartBettingRound( true )
+	Main:Emote( "TURN", self:CardName( self.table[1] ),
+						self:CardName( self.table[2] ), 
+						self:CardName( self.table[3] ), 
+						self:CardName( self.table[4] ) )
+								
+	Main:PartyPrint( "**TURN DEALT**" )
+	self:PrintTableCards()
+	
+	self:SaveState()
+	Main.UI:Update()
+end
+
+-------------------------------------------------------------------------------
+function Main.Game:DealRiver()
+	assert( self.round == "POSTTURN" and self:AllPlayersActed() )
+	
+	self:PushHistory( "Deal River" )
+	self:DrawCard() -- burn and turn
+	
+	self.round = "POSTRIVER"
+	table.insert( self.table, self:DrawCard() )
+	self:StartBettingRound( true )
+	Main:Emote( "RIVER", self:CardName( self.table[1] ),
+						 self:CardName( self.table[2] ), 
+						 self:CardName( self.table[3] ), 
+						 self:CardName( self.table[4] ),
+						 self:CardName( self.table[5] ) )
+								
+	Main:PartyPrint( "**RIVER DEALT**" )
+	self:PrintTableCards()
+	
+	self:SaveState()
+	Main.UI:Update()
+end
+
+function Main.Game:DoShowdown()
+	
+	assert( self.round == "POSTRIVER" and self:AllPlayersActed() )
+	self:PushHistory( "Showdown" )
+	
+	
+	
+	self:SaveState()
+	Main.UI:Update()
+end
+
+-------------------------------------------------------------------------------
 function Main.Game:NextRound() 
 	if not self.round_complete then
 		Main:Print( "The current round is not complete." )
 		return
+	end
+	
+	self:CheckPots()
+	
+	if self:ActivePlayers() == 1 then
+	
+		self:PushHistory( "Ended Hand" )
+		
+		self.hand_complete = true
+		-- distribute pot
+		
+		self:SaveState()
+		return
+	end
+	
+	if self.round == "PREFLOP" then
+		self:DealFlop()
+	elseif self.round == "POSTFLOP" then
+		self:DealTurn()
+	elseif self.round == "POSTTURN" then
+		self:DealRiver()
+	elseif self.round == "POSTRIVER" then
+		self:DoShowdown()
 	end
 end
 
@@ -757,22 +903,45 @@ function Main.Game:EndHand()
 end
 
 -------------------------------------------------------------------------------
--- Distribute pots to winning players
+-- Check pots and refund players who were unmatched
 --
 function Main.Game:CheckPots()
-	-- what does this do? checks all hands and distributes pots according
-	-- to individual bets?
+	
 end
 
 -------------------------------------------------------------------------------
-function Main.Game:SortWinners()
+function Main.Game:GetWinners()
+	local winners = {}
 	
+	for k,v in pairs( self.players ) do
+		Main:UpdatePlayerRank( v )
+		
+		for i = 1, #winners+1 do
+			
+			if winners[i] == nil then
+				-- create new entry
+				table.insert( winners, { rank = v.rank, players = { k } } )
+			else
+				if v.rank == winners[i].rank then
+					-- add to names, we have a tie
+					table.insert( winners[i].players, k )
+				elseif v.rank > winners[i].rank then
+					-- we have a better hand, insert new entry
+					table.insert( winners, i, { rank = v.rank, players = { k } } )
+				end
+			end
+		end
+	end
+	
+	return winners
 end
 
 -------------------------------------------------------------------------------
 -- Start a new hand.
 --
 function Main.Game:DealHand()
+	assert( self.hand_complete )
+	
 	self:PushHistory( "Deal Hand" )
 	
 	-- emote: deals a new hand. <a> and <b> place the blinds (1000g)
@@ -780,7 +949,8 @@ function Main.Game:DealHand()
 	self.hand_complete = false
 	self.round  = "PREFLOP"
 	self.raises = 0
-	self.bet    = g_ante + g_big_blind
+	self.bet    = self.ante + self.big_blind
+	self.pot    = 0
 	self.table  = {}
 	
 	self:NewDeck()
@@ -801,6 +971,13 @@ function Main.Game:DealHand()
 	
 	if self:ActivePlayers() < 2 then
 		Main:Print( "Not enough players for a new hand." )
+		
+		-- cancel
+		self.hand_complete = true
+		self.round = ""
+		
+		self:SaveState()
+		Main.UI:Update()
 		return
 	end
 	
@@ -815,7 +992,9 @@ function Main.Game:DealHand()
 	self:PlayerDealCards()
 	
 	for k,v in pairs( self.players ) do
-		self:TellCards( v )
+		if not v.folded then
+			self:TellCards( v )
+		end
 	end
 	
 	self:NextTurn()
@@ -829,6 +1008,7 @@ function Main.Game:DealHand()
 	self:StartBettingRound( false )
 	
 	self:SaveState()
+	Main.UI:Update()
 end
 
 -------------------------------------------------------------------------------
@@ -839,6 +1019,11 @@ end
 function Main.Game:AdjustCredit( player, amount )
 	local p = self:GetPlayer( player )
 	if not p then return end
+	
+	if not self.hand_complete and p.folded or p.allin then
+		Main:Print( "Cannot add credit to player right now." )
+		return
+	end
 	
 	self:PushHistory( "Adjust Credit" )
 	
@@ -871,6 +1056,48 @@ function Main.Game:GetPlayerString( player )
 end
 
 -------------------------------------------------------------------------------
+-- Print the community cards on the table to the party.
+--
+function Main.Game:PrintTableCards()
+	local cards = ""
+	for _,v in ipairs( self.table ) do
+		if cards ~= "" then cards = cards .. ", " end
+		
+		cards = cards .. self:CardName( v )
+	end
+	
+	Main:PartyPrint( "TABLE CARDS: " .. cards )
+end
+
+-------------------------------------------------------------------------------
+-- Cancel the current hand, returning bets to players and resetting
+-- the state.
+--
+function Main.Game:CancelHand()
+	self:PushHistory( "Cancel Hand" )
+	self.round = ""
+	self.round_complete = true
+	self.hand_complete = true
+	self.pot = 0
+	self.bet = 0
+	self:SaveState()
+	
+	Main.UI:Update()
+end
+
+function Main.Game:Reset()
+	self:PushHistory( "Reset" )
+	
+	self:LoadState( DEFAULT_STATE )
+	self:SaveState()
+	Main.UI:Update()
+end
+
+function Main:SendChatMessage( text, chattype, dest )
+	ChatThrottleLib:SendChatMessage( "NORMAL", self.cprefix, text, chattype, nil, dest )
+end
+ 
+-------------------------------------------------------------------------------
 -- Print a string.
 --
 -- @param text Text to print, may contain placeholders {1}, {2}, {3} etc which
@@ -887,3 +1114,15 @@ function Main:Print( text, ... )
 	print( "|cffa9003b<RP Poker>|r " .. text )
 end
 
+-------------------------------------------------------------------------------
+function Main:PartyPrint( text )
+	local channel
+	
+	if IsInRaid() then
+		channel = "RAID"
+	else
+		channel = "PARTY"
+	end
+	
+	self:SendChatMessage( text, channel )
+end
