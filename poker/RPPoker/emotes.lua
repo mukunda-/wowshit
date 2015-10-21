@@ -1,8 +1,10 @@
 local Main = RPPoker
+local AceGUI = LibStub("AceGUI-3.0") 
 
 local EMOTES = {
 
 	FLOP = {
+		--{ function( card1, card2, card3 ) return string.format( "burns a card and deals the flop: %s, %s, and %s", card1, card2, card3 ) end };
 		{ text = "burns a card and deals the flop: {1}, {2}, and {3}." };
 	};
 	TURN = {
@@ -13,7 +15,21 @@ local EMOTES = {
 	};
 }
 
-function Main:Emote( template, ... )
+Main.Emotes = {
+	panel = nil;
+	text  = "";
+}
+
+function Main.Emotes:Init()
+	local f = AceGUI:Create( "Frame" )
+	self.panel = f
+	local e
+	e = AceGUI:Create( "EditBox" )
+	self.editbox = e
+	f:AddChild(e)
+end
+
+function Main.Emotes:Start( template, ... )
 
 	template = EMOTES[template]
 	template = template[ math.random( 1, #template ) ]
@@ -25,4 +41,21 @@ function Main:Emote( template, ... )
 	end
 	
 	Main:SendChatMessage( str, "EMOTE" )
+end
+
+function Main.Emotes:ShowPanel()
+	self.panel:Show()
+end
+
+function Main.Emotes:Reset()
+	self.text = ""
+	
+end
+
+function Main.Emotes:Queue( text )
+	if self.text ~= "" then
+		self.text = self.text .. " "
+	end
+	self.text = self.text .. text
+	self.editbox:SetText( self.text )
 end

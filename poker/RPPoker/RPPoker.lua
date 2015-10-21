@@ -244,7 +244,7 @@ function Main.Game:CreatePlayer( name, alias, credit )
 		allin  = false;
 		acted  = true;
 		bet    = 0;
-		pot    = 0;
+--		pot    = 0;
 		active = true;
 	}
 end
@@ -420,8 +420,6 @@ function Main.Game:AddBet( player, amount )
 		player.allin = true
 		player.acted = true
 	end
-	
-	self.pot = self.pot + amount
 	
 	player.bet = player.bet + amount
 	self.bet = math.max( self.bet, player.bet )
@@ -847,19 +845,64 @@ function Main.Game:DealRiver()
 	Main.UI:Update()
 end
 
+-------------------------------------------------------------------------------
+-- Returns a comma separated list of entries from an array as a string.
+--
+local function CommaList( list )
+	local text = ""
+	for _,v in ipairs( list ) do
+		if text ~= "" then
+			text = text .. ", "
+		end
+		text = text .. v
+	end
+	return text
+end
+
 function Main.Game:DoShowdown()
 	
 	assert( self.round == "POSTRIVER" and self:AllPlayersActed() )
 	self:PushHistory( "Showdown" )
 	
+	Main:PartyPrint( "**SHOWDOWN**" )
 	
+	local wins = self:GetWinners()
+	for potnum,v in ipairs( wins ) do
+		local winner_names = {}
+		for _,p in pairs( v.winners ) do
+			self.players[p].credit = self.players[p].credit + math.floor(v.amount/#v.winners)
+			table.insert( winner_names, self.players[p].alias )
+		end
+		
+		winner_names = CommaList( winner_names )
+		if potnum == 1 then
+			local potname = ""
+			if potnum == 1 and #wins ~= 1 then
+				potname = "MAIN POT "
+			elseif potnum > 1 then
+				potname = "SIDE POT "
+				if #wins > 2 then
+					potname = potname .. (potnum-1) .. " "
+				end
+			end
+			
+			Main:PartyPrint( string.format( "%sWINNER%s (%s): %s WITH %s", 
+											potname,
+											#v.winners == 1 and "" or "S",
+											v.amount .. "g",
+											winner_names,
+											string.upper(Main:FormatRank( v.rank )) ))
+		
+		
+		end
+	end
 	
 	self:SaveState()
 	Main.UI:Update()
 end
 
 -------------------------------------------------------------------------------
-function Main.Game:NextRound() 
+function Main.Game:NextRound()
 	if not self.round_complete then
 		Main:Print( "The current round is not complete." )
 		return
@@ -912,28 +955,58 @@ end
 -------------------------------------------------------------------------------
 function Main.Game:GetWinners()
 	local winners = {}
+	local bet2 = {}
 	
 	for k,v in pairs( self.players ) do
 		Main:UpdatePlayerRank( v )
+		bet2[k] = v.bet
+	end
+	
+	local pots = {}
+	
+	while true do
+		local bet = 9999999999999
+		local amount = 0
+		local players = {}
+		for k,v in pairs( self.players ) do
+			if bet2[k] > 0 then
+				bet = math.min( bet, bet2[k] )
+			end
+		end
 		
-		for i = 1, #winners+1 do
-			
-			if winners[i] == nil then
-				-- create new entry
-				table.insert( winners, { rank = v.rank, players = { k } } )
-			else
-				if v.rank == winners[i].rank then
-					-- add to names, we have a tie
-					table.insert( winners[i].players, k )
-				elseif v.rank > winners[i].rank then
-					-- we have a better hand, insert new entry
-					table.insert( winners, i, { rank = v.rank, players = { k } } )
+		if bet == 0 then break end
+		
+		for k,v in pairs( self.players ) do
+			if bet2[k] > 0 then
+				bet2[k] = bet2[k] - bet
+				amount = amount + bet
+				if not v.folded then
+					table.insert( players, k )
 				end
+			end
+		end
+		
+		table.insert( pots, { amount = amount, players = players, winners = {} } )
+	end
+	 
+	for k,v in pairs( pots ) do
+	
+		local bestrank = 0
+		
+		for _,p in pairs( v.players ) do
+			bestrank = math.max( self.players[p].rank, bestrank )
+		end
+		
+		v.rank = bestrank
+		
+		for _,p in pairs( v.players ) do
+			if self.players[p].rank == bestrank then
+				table.insert( v.winners, p )
 			end
 		end
 	end
 	
-	return winners
+	return pots
 end
 
 -------------------------------------------------------------------------------
@@ -1085,6 +1158,7 @@ function Main.Game:CancelHand()
 	Main.UI:Update()
 end
 
+-------------------------------------------------------------------------------
 function Main.Game:Reset()
 	self:PushHistory( "Reset" )
 	
@@ -1093,6 +1167,7 @@ function Main.Game:Reset()
 	Main.UI:Update()
 end
 
+-------------------------------------------------------------------------------
 function Main:SendChatMessage( text, chattype, dest )
 	ChatThrottleLib:SendChatMessage( "NORMAL", self.cprefix, text, chattype, nil, dest )
 end

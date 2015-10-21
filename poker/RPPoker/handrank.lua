@@ -8,6 +8,19 @@ local Main = RPPoker
 -- they -may- assume that a higher rank was already checked beforehand
 --
 
+local RankStrings = {
+	[0] = "High Card";
+	[1] = "Pair";
+	[2] = "Two Pairs";
+	[3] = "Three of a Kind";
+	[4] = "Straight";
+	[5] = "Flush";
+	[6] = "Full House";
+	[7] = "Four of a Kind";
+	[8] = "Straight Flush";
+	[9] = "Royal Flush";
+}
+
 -------------------------------------------------------------------------------
 local function EncodeRank( rank, v1, v2, v3, v4, v5 )  
 	return rank * 1048576 + (v1 or 0) * 65536 + (v2 or 0) * 4096 
@@ -340,4 +353,9 @@ function Main:UpdatePlayerRank( player )
 	end
 	
 	p.rank = self:ComputeHandRank( cards )
+end
+
+function Main:FormatRank( rank )
+	local r = math.floor(rank / 1048576)
+	return RankStrings[r]
 end
