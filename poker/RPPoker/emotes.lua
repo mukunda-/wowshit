@@ -1,6 +1,7 @@
 local Main = RPPoker
 local AceGUI = LibStub("AceGUI-3.0") 
 
+-------------------------------------------------------------------------------
 local EMOTES = {
 
 	FLOP = {
@@ -15,20 +16,25 @@ local EMOTES = {
 	};
 }
 
+-------------------------------------------------------------------------------
 Main.Emotes = {
 	panel = nil;
 	text  = "";
 }
 
+-------------------------------------------------------------------------------
 function Main.Emotes:Init()
 	local f = AceGUI:Create( "Frame" )
+	f:Hide()
 	self.panel = f
 	local e
 	e = AceGUI:Create( "EditBox" )
 	self.editbox = e
 	f:AddChild(e)
+	
 end
 
+-------------------------------------------------------------------------------
 function Main.Emotes:Start( template, ... )
 
 	template = EMOTES[template]
@@ -43,15 +49,18 @@ function Main.Emotes:Start( template, ... )
 	Main:SendChatMessage( str, "EMOTE" )
 end
 
+-------------------------------------------------------------------------------
 function Main.Emotes:ShowPanel()
 	self.panel:Show()
 end
 
+-------------------------------------------------------------------------------
 function Main.Emotes:Reset()
 	self.text = ""
 	
 end
 
+-------------------------------------------------------------------------------
 function Main.Emotes:Queue( text )
 	if self.text ~= "" then
 		self.text = self.text .. " "

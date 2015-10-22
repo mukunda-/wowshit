@@ -19,8 +19,10 @@ function Main:OnInitialize()
 	Main.Game:AddPlayer( "Llanna", "Llanna", 5000 )
 	
 	self.UI:Init()
+	self.Emotes:Init()
 end
 
+-------------------------------------------------------------------------------
 function Main:OnEnable()
 	self.UI:Update()
 end

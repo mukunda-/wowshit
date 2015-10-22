@@ -125,7 +125,7 @@ local methods = {
 		
 		self.frame.text_name:SetText( nametext )
 		self.frame.text_gold:SetText( "Credit: " .. player.credit .. " |TInterface/MONEYFRAME/UI-GoldIcon:0|t" )
-		self.frame.text_bet:SetText( "Bet: " .. player.pot .. " |TInterface/MONEYFRAME/UI-GoldIcon:0|t" )
+		self.frame.text_bet:SetText( "Bet: " .. player.bet .. " |TInterface/MONEYFRAME/UI-GoldIcon:0|t" )
 		
 		if Main.Game.hand_complete then
 			self.frame.turn:Hide()
@@ -139,7 +139,7 @@ local methods = {
 			end
 			
 			if player.folded then
-				if player.pot == 0 then
+				if player.bet == 0 then
 					self.frame.text_status:SetText( "FOLDED" )
 				else
 					self.frame.text_status:SetText( "BREAK" )

@@ -789,7 +789,7 @@ function Main.Game:DealFlop()
 	self:StartBettingRound( true )
 	
 	
-	Main:Emote( "FLOP", self:CardName( self.table[1] ),
+	Main.Emotes:Start( "FLOP", self:CardName( self.table[1] ),
 						self:CardName( self.table[2] ), 
 						self:CardName( self.table[3] ) )
 						
@@ -859,6 +859,7 @@ local function CommaList( list )
 	return text
 end
 
+-------------------------------------------------------------------------------
 function Main.Game:DoShowdown()
 	
 	assert( self.round == "POSTRIVER" and self:AllPlayersActed() )
@@ -893,7 +894,7 @@ function Main.Game:DoShowdown()
 											winner_names,
 											string.upper(Main:FormatRank( v.rank )) ))
 		
-		
+			Main.Emotes:Queue( "%s wins the hand with a %s." )
 		end
 	end
 	
