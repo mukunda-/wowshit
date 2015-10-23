@@ -244,6 +244,7 @@ function Main.Game:CreatePlayer( name, alias, credit )
 		allin  = false;
 		acted  = true;
 		bet    = 0;
+		male   = UnitSex( name ) == 2;
 --		pot    = 0;
 		active = true;
 	}
@@ -789,9 +790,10 @@ function Main.Game:DealFlop()
 	self:StartBettingRound( true )
 	
 	
-	Main.Emotes:Start( "FLOP", self:CardName( self.table[1] ),
-						self:CardName( self.table[2] ), 
-						self:CardName( self.table[3] ) )
+	Main.Emote:Reset()
+	Main.Emote:AddTemplate( "FLOP", self:CardName( self.table[1] ),
+						            self:CardName( self.table[2] ), 
+						            self:CardName( self.table[3] ))
 						
 	Main:PartyPrint( "**FLOP DEALT**" )
 	self:PrintTableCards()
@@ -810,10 +812,12 @@ function Main.Game:DealTurn()
 	self.round = "POSTTURN"
 	table.insert( self.table, self:DrawCard() )
 	self:StartBettingRound( true )
-	Main:Emote( "TURN", self:CardName( self.table[1] ),
-						self:CardName( self.table[2] ), 
-						self:CardName( self.table[3] ), 
-						self:CardName( self.table[4] ) )
+	
+	Main.Emote:Reset()
+	Main.Emote:AddTemplate( "TURN", self:CardName( self.table[1] ),
+						            self:CardName( self.table[2] ), 
+						            self:CardName( self.table[3] ), 
+						            self:CardName( self.table[4] ) )
 								
 	Main:PartyPrint( "**TURN DEALT**" )
 	self:PrintTableCards()
@@ -832,11 +836,13 @@ function Main.Game:DealRiver()
 	self.round = "POSTRIVER"
 	table.insert( self.table, self:DrawCard() )
 	self:StartBettingRound( true )
-	Main:Emote( "RIVER", self:CardName( self.table[1] ),
-						 self:CardName( self.table[2] ), 
-						 self:CardName( self.table[3] ), 
-						 self:CardName( self.table[4] ),
-						 self:CardName( self.table[5] ) )
+	
+	Main.Emote:Reset()
+	Main.Emote:AddTemplate( "RIVER", self:CardName( self.table[1] ),
+						             self:CardName( self.table[2] ), 
+						             self:CardName( self.table[3] ), 
+						             self:CardName( self.table[4] ),
+						             self:CardName( self.table[5] ) )
 								
 	Main:PartyPrint( "**RIVER DEALT**" )
 	self:PrintTableCards()
@@ -859,6 +865,21 @@ local function CommaList( list )
 	return text
 end
 
+local function CommaAndList( list )
+	local text = ""
+	for i = 1,#list do
+		if text ~= "" then
+			if i == #list then
+				text = text .. " and "
+			else
+				text = text .. ", "
+			end
+		end
+		text = text .. v
+	end
+	return text
+end
+
 -------------------------------------------------------------------------------
 function Main.Game:DoShowdown()
 	
@@ -867,34 +888,105 @@ function Main.Game:DoShowdown()
 	
 	Main:PartyPrint( "**SHOWDOWN**" )
 	
+	local iswinner = {}
+	
 	local wins = self:GetWinners()
 	for potnum,v in ipairs( wins ) do
+		local winner_and_names = {}
 		local winner_names = {}
 		for _,p in pairs( v.winners ) do
 			self.players[p].credit = self.players[p].credit + math.floor(v.amount/#v.winners)
 			table.insert( winner_names, self.players[p].alias )
+			iswinner[p] = true
 		end
 		
+		winner_and_names = CommaAndList( winner_names )
 		winner_names = CommaList( winner_names )
-		if potnum == 1 then
-			local potname = ""
-			if potnum == 1 and #wins ~= 1 then
-				potname = "MAIN POT "
-			elseif potnum > 1 then
-				potname = "SIDE POT "
-				if #wins > 2 then
-					potname = potname .. (potnum-1) .. " "
+		
+		local potname = ""
+		local potnamef = ""
+		if potnum == 1 and #wins ~= 1 then
+			potname = "main pot "
+			potnamef = potname
+		elseif potnum > 1 then
+			potname = "side pot "
+			potnamef = potname
+			if #wins > 2 then
+				potname = potname .. (potnum-1) .. " "
+				potnamef = potname
+				local things = { "first", "second", "third", "fourth", 
+				                 "fifth", "sixth", "seventh", "eighth", 
+								 "nineth", "tenth", "eleventh", "twelfth", 
+								 "thirteenth", "fourteenth", "fifteenth" }
+				if things[ potnum ] then
+					potnamef = things .. potnamef
 				end
 			end
-			
-			Main:PartyPrint( string.format( "%sWINNER%s (%s): %s WITH %s", 
-											potname,
-											#v.winners == 1 and "" or "S",
-											v.amount .. "g",
-											winner_names,
-											string.upper(Main:FormatRank( v.rank )) ))
+		end
 		
-			Main.Emotes:Queue( "%s wins the hand with a %s." )
+		local rankname = Main:FormatRank( v.rank )
+		
+		Main:PartyPrint( string.format( "%sWINNER%s (%s): %s WITH %s", 
+										string.upper(potname),
+										#v.winners == 1 and "" or "S",
+										v.amount .. "g",
+										winner_names,
+										string.upper(rankname) ))
+										
+		winner_names = CommaAndList( winner_names )
+		
+		if #wins == 1 and #v.winners == 1 then
+			if #v.winners == 1 then
+				Main.Emote:Add( "%s wins the hand (%sg) with %s.",
+								 winner_and_names, v.amount, rankname )
+			else
+				Main.Emote:Add( "%s split the pot (%sg) with %s.",
+								 winner_and_names, v.amount, rankname )
+			end
+		elseif #wins > 1 then
+			if #v.winners == 1 then
+				Main.Emote:Add( "%s wins the %s(%s) with %s.", 
+			                 winner_and_names, potnamef, v.amount, rankname )
+			else
+				Main.Emote:Add( "%s split the %s(%s) with %s.", 
+			                 winner_and_names, potnamef, v.amount, rankname )
+			end
+		end
+	end
+	
+	-- The player who bet on the river is the 
+	-- default first player to reveal their hand.
+	local index = self.riverbet or self.dealer
+	local last_winner = nil
+	for counter = 1, #self.players do
+		index = index + 1
+		if index > #self.players then index = 1 end
+		if iswinner[index] then
+			last_winner = index
+		end
+		
+	end
+	
+	local showcards = true
+	index = self.riverbet or self.dealer
+	for counter = 1, #self.players do 
+		index = index + 1
+		if index > #self.players then index = 1 end
+		if index == last_winner then
+			showcards = false
+		end
+		
+		if not iswinner then
+			local p = self.players[index]
+			
+			if showcards then
+				local rank = Main:FormatRank( p.rank )
+				Main:PartyPrint( "%s: %s", p.alias, string.upper( rank ))
+				Main.Emote:Add( "%s had %s.", rank )
+			else
+				Main:PartyPrint( "%s: MUCKED" )
+				Main.Emote:Add( "%s mucked %s hand.", rank, p.male and "his" or "her" )
+			end
 		end
 	end
 	
@@ -966,12 +1058,16 @@ function Main.Game:GetWinners()
 	local pots = {}
 	
 	while true do
-		local bet = 9999999999999
+		local bet = 0
 		local amount = 0
 		local players = {}
 		for k,v in pairs( self.players ) do
 			if bet2[k] > 0 then
-				bet = math.min( bet, bet2[k] )
+				if bet == 0 then 
+					bet = bet2[k]
+				else 
+					bet = math.min( bet, bet2[k] )
+				end
 			end
 		end
 		
@@ -1016,6 +1112,22 @@ end
 function Main.Game:DealHand()
 	assert( self.hand_complete )
 	
+	-- check if there's enough players
+	do
+		local count = 0
+		for k,v in pairs( self.players ) do
+			if v.active and v.credit > 0 then
+				count = count + 1
+				if count >= 2 then break end
+			end
+		end
+		
+		if count < 2 then
+			Main:Print( "Not enough players for a new hand." )
+			return
+		end
+	end
+	
 	self:PushHistory( "Deal Hand" )
 	
 	-- emote: deals a new hand. <a> and <b> place the blinds (1000g)
@@ -1036,13 +1148,14 @@ function Main.Game:DealHand()
 		v.acted  = false
 		v.allin  = false
 		
-		if not v.active or v.credit == 0 then
+		if not v.active or v.credit <= 0 then
 			-- sit out this hand
 			v.folded = true
 			v.acted  = true
 		end
 	end
 	
+	-- may not need this clause down here with the new one above now
 	if self:ActivePlayers() < 2 then
 		Main:Print( "Not enough players for a new hand." )
 		
@@ -1055,9 +1168,7 @@ function Main.Game:DealHand()
 		return
 	end
 	
-	self:PlayerAnteUp()
-	
-	print( "DEBUG: NEW HAND" )
+	self:PlayerAnteUp() 
 	
 	-- pass the button
 	self.dealer = self:FindNextPlayer( self.dealer )

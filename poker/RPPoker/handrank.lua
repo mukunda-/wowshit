@@ -9,16 +9,16 @@ local Main = RPPoker
 --
 
 local RankStrings = {
-	[0] = "High Card";
-	[1] = "Pair";
-	[2] = "Two Pairs";
-	[3] = "Three of a Kind";
-	[4] = "Straight";
-	[5] = "Flush";
-	[6] = "Full House";
-	[7] = "Four of a Kind";
-	[8] = "Straight Flush";
-	[9] = "Royal Flush";
+	[0] = "a High Card";
+	[1] = "a Pair";
+	[2] = "two Pairs";
+	[3] = "a Three of a Kind";
+	[4] = "a Straight";
+	[5] = "a Flush";
+	[6] = "a Full House";
+	[7] = "a Four of a Kind";
+	[8] = "a Straight Flush";
+	[9] = "a Royal Flush";
 }
 
 -------------------------------------------------------------------------------
@@ -36,7 +36,7 @@ end
 local function StraightFlush( cards )
 	local sets = {{},{},{},{}}
 	for _,v in ipairs( cards ) do
-		local number, suit = CardValue( v )
+		local number, suit = Main.Game:CardValue( v )
 		table.insert( sets[suit], number )
 	end
 	
@@ -81,7 +81,7 @@ local function FourKind( cards )
 	local found = 0
 	
 	for _,v in ipairs( cards ) do
-		local number, suit = CardValue( v, true )
+		local number, suit = Main.Game:CardValue( v, true )
 		counts[number] = (counts[number] or 0) + 1
 		if counts[number] == 4 then
 			found = math.max( found, number )
@@ -114,10 +114,10 @@ end
 local function FullHouse( cards )
 	local counts = {}
 	
-	local triples, doubles = {}
+	local triples, doubles = {}, {}
 	
 	for _,v in ipairs( cards ) do
-		local number = CardValue( v, true )
+		local number = Main.Game:CardValue( v, true )
 		
 		counts[number] = (counts[number] or 0) + 1
 		if counts[number] == 2 then
@@ -149,7 +149,7 @@ local function Flush( cards )
 	local highest = {} -- highest of each suit
 	
 	for _,v in ipairs( cards ) do
-		local number, suit = CardValue( v, true )
+		local number, suit = Main.Game:CardValue( v, true )
 		
 		counts[suit] = (counts[suit] or 0) + 1
 		highest[suit] = math.max( highest[suit] or 0, number )
@@ -180,7 +180,7 @@ local function Straight( cards )
 	local cards2 = {} -- unique cards
 	
 	for _,v in ipairs( cards ) do 
-		local number = CardValue( v )
+		local number = Main.Game:CardValue( v )
 		if not found[number] then
 			found[number] = true
 			table.insert( cards2, number )
@@ -217,8 +217,8 @@ local function ThreeKind( cards )
 
 	local cards2 = {}
 	
-	for k,v in ipairs(cards) do
-		local number = CardValue( cards, true )
+	for _,v in ipairs(cards) do
+		local number = Main.Game:CardValue( v, true )
 		table.insert( cards2, number )
 	end
 	table.sort( cards2, ReverseTableSort )
@@ -250,8 +250,8 @@ local function TwoPairs( cards )
 	
 	local cards2 = {}
 	
-	for k,v in ipairs(cards) do
-		local number = CardValue( cards, true )
+	for _,v in ipairs(cards) do
+		local number = Main.Game:CardValue( v, true )
 		table.insert( cards2, number )
 	end
 	table.sort( cards2, ReverseTableSort )
@@ -282,13 +282,13 @@ end
 local function OnePair( cards )
 	local found = 0
 	local cards2 = {}
-	for k,v in ipairs( cards ) do
-		local number = CardValue( cards, true )
+	for _,v in ipairs( cards ) do
+		local number = Main.Game:CardValue( v, true )
 		table.insert( cards2, number )
 	end
 	table.sort( cards2, ReverseTableSort )
 	
-	while i <= #cards2-1 do
+	for i = 1,#cards2-1 do
 	
 		if cards2[i] == cards2[i+1] then
 			found = cards2[i]
@@ -307,8 +307,8 @@ end
 -------------------------------------------------------------------------------
 local function HighCard( cards )
 	local cards2 = {}
-	for k,v in ipairs( cards ) do
-		local number = CardValue( cards, true )
+	for _,v in ipairs( cards ) do
+		local number = Main.Game:CardValue( v, true )
 		table.insert( cards2, number )
 	end
 	table.sort( cards2, ReverseTableSort )
@@ -330,7 +330,7 @@ function Main:ComputeHandRank( cards )
 	return StraightFlush(cards)
 		   or FourKind(cards)  or FullHouse(cards)
 		   or Flush(cards)     or Straight(cards)
-		   or ThreeKind(cards) or TwoPair(cards)
+		   or ThreeKind(cards) or TwoPairs(cards)
 		   or OnePair(cards)   or HighCard(cards)
 end
 
@@ -344,17 +344,18 @@ function Main:UpdatePlayerRank( player )
 	-- cards is table cards and player cards combined
 	local cards = {}
 	
-	for _,v in ipairs( p.hand ) do
+	for _,v in ipairs( player.hand ) do
 		table.insert( cards, v )
 	end
 	
-	for _,v in ipairs( self.table ) do
+	for _,v in ipairs( Main.Game.table ) do
 		table.insert( cards, v )
 	end
 	
-	p.rank = self:ComputeHandRank( cards )
+	player.rank = self:ComputeHandRank( cards )
 end
 
+-------------------------------------------------------------------------------
 function Main:FormatRank( rank )
 	local r = math.floor(rank / 1048576)
 	return RankStrings[r]

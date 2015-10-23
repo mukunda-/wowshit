@@ -17,26 +17,48 @@ local EMOTES = {
 }
 
 -------------------------------------------------------------------------------
-Main.Emotes = {
+Main.Emote = {
 	panel = nil;
 	text  = "";
 }
 
+local Module = Main.Emote
+
 -------------------------------------------------------------------------------
-function Main.Emotes:Init()
+function Module:Init()
 	local f = AceGUI:Create( "Frame" )
+	f:SetHeight( 280 )
+	f:SetWidth( 500 )
+	f:SetLayout( "Flow" )
+	f:SetTitle( "Emote" )
 	f:Hide()
 	self.panel = f
-	local e
-	e = AceGUI:Create( "EditBox" )
-	self.editbox = e
-	f:AddChild(e)
 	
+	local e
+	e = AceGUI:Create( "MultiLineEditBox" )
+	self.editbox = e
+	e:DisableButton( true )
+	e:SetLabel( "Emote:" )
+	e:SetFullWidth( true )
+	e:SetNumLines( 10 )
+	f:AddChild( e )
+	
+	e = AceGUI:Create( "Button" )
+	e:SetText( "Send" )
+	e:SetCallback( "OnClick", function() Module:Send() end )
+	e:SetWidth( 100 )
+	f:AddChild( e )
+	
+	e = AceGUI:Create( "Button" )
+	e:SetText( "Reset" )
+	e:SetCallback( "OnClick", function() Module:ResetEditbox() end )
+	e:SetWidth( 100 )
+	f:AddChild( e )
 end
 
 -------------------------------------------------------------------------------
-function Main.Emotes:Start( template, ... )
-
+function Module:AddTemplate( template, ... )
+	
 	template = EMOTES[template]
 	template = template[ math.random( 1, #template ) ]
 	local str = template.text
@@ -46,25 +68,40 @@ function Main.Emotes:Start( template, ... )
 		str = string.gsub( str, "{" .. i .. "}", text )
 	end
 	
-	Main:SendChatMessage( str, "EMOTE" )
+	self:Add( str )
 end
 
 -------------------------------------------------------------------------------
-function Main.Emotes:ShowPanel()
+function Module:ShowPanel()
 	self.panel:Show()
 end
 
 -------------------------------------------------------------------------------
-function Main.Emotes:Reset()
+function Module:Reset()
 	self.text = ""
-	
 end
 
 -------------------------------------------------------------------------------
-function Main.Emotes:Queue( text )
+function Module:Add( text, ... )
+	if select( "#", ... ) ~= 0 then
+		text = string.format( text, ... )
+	end
 	if self.text ~= "" then
 		self.text = self.text .. " "
 	end
 	self.text = self.text .. text
+	self:ResetEditbox()
+	self:ShowPanel()
+end
+
+-------------------------------------------------------------------------------
+function Module:ResetEditbox()
 	self.editbox:SetText( self.text )
+end
+
+-------------------------------------------------------------------------------
+function Module:Send()
+	self.text = self.editbox:GetText()
+	Main:SendChatMessage( self.editbox:GetText(), "EMOTE" )
+	print( self.text )
 end
