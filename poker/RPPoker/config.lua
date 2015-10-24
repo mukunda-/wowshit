@@ -13,7 +13,7 @@ local DB_DEFAULTS = {
 		button_icon = 2; -- circle
 		turn_icon   = 4; -- triangle
 		
-		ante        = 250;
+		ante        = 0;
 		small_blind = 500;
 		big_blind   = 1000;
 		multiplier  = 1.0;

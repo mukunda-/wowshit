@@ -56,6 +56,8 @@ local DEFAULT_STATE = {
 
 	table  = {};           -- community cards
 	
+	riverbet = nil;
+	
 	history_note = "";
 }
 
@@ -74,7 +76,7 @@ local state_keys = {
 	"big_blind", "multiplier", "deck", "state",
 	"round", "round_complete", "hand_complete",
 	"turn", "pot", "bet", "raises", "table",
-	"history_note"
+	"history_note", "riverbet"
 }
 
 local NUM_HISTORY_ENTRIES = 10
@@ -347,7 +349,7 @@ end
 -- Reset the table.
 --
 function Main.Game:ResetGame()
-	self.dealer = math.random( 1, #self.players )
+	--self.dealer = math.random( 1, #self.players )
 	self.pot    = 0
 	
 	self.ante        = Main.Config.db.profile.ante
@@ -355,7 +357,6 @@ function Main.Game:ResetGame()
 	self.big_blind   = Main.Config.db.profile.big_blind
 	self.multiplier  = Main.Config.db.profile.multiplier
 	
-	self:NewDeck()
 end
 
 -------------------------------------------------------------------------------
@@ -461,7 +462,7 @@ function Main.Game:PlayerAnteUp()
 		for _,p in pairs(self.players) do
 		
 			if not p.folded then
-				AddBet( p, self.ante )
+				self:AddBet( p, self.ante )
 			end
 		end
 	end
@@ -542,7 +543,7 @@ function Main.Game:PlayerCall()
 	self:PushHistory( "Player Call" )
 	
 	p.acted = true
-	AddBet( p, self.bet - self.bet )
+	self:AddBet( p, self.bet - p.bet )
 	
 	self:ContinueBettingRound()
 	
@@ -866,10 +867,11 @@ local function CommaList( list )
 end
 
 local function CommaAndList( list )
+	
 	local text = ""
-	for i = 1,#list do
+	for k,v in ipairs( list ) do
 		if text ~= "" then
-			if i == #list then
+			if k == #list then
 				text = text .. " and "
 			else
 				text = text .. ", "
@@ -890,7 +892,10 @@ function Main.Game:DoShowdown()
 	
 	local iswinner = {}
 	
+	Main.Emote:Reset()
+	
 	local wins = self:GetWinners()
+	
 	for potnum,v in ipairs( wins ) do
 		local winner_and_names = {}
 		local winner_names = {}
@@ -932,9 +937,7 @@ function Main.Game:DoShowdown()
 										v.amount .. "g",
 										winner_names,
 										string.upper(rankname) ))
-										
-		winner_names = CommaAndList( winner_names )
-		
+										 
 		if #wins == 1 and #v.winners == 1 then
 			if #v.winners == 1 then
 				Main.Emote:Add( "%s wins the hand (%sg) with %s.",
@@ -955,8 +958,10 @@ function Main.Game:DoShowdown()
 	end
 	
 	-- The player who bet on the river is the 
-	-- default first player to reveal their hand.
-	local index = self.riverbet or self.dealer
+	-- default first player to reveal their hand. otherwise
+	-- to the left of the dealer
+	local index
+	if self.riverbet then index = self.riverbet-1 else index = self.dealer end
 	local last_winner = nil
 	for counter = 1, #self.players do
 		index = index + 1
@@ -969,6 +974,7 @@ function Main.Game:DoShowdown()
 	
 	local showcards = true
 	index = self.riverbet or self.dealer
+	if self.riverbet then index = self.riverbet-1 else index = self.dealer end
 	for counter = 1, #self.players do 
 		index = index + 1
 		if index > #self.players then index = 1 end
@@ -989,6 +995,10 @@ function Main.Game:DoShowdown()
 			end
 		end
 	end
+	
+	self.hand_complete = true
+	self.round_complete = true
+	self.round = ""
 	
 	self:SaveState()
 	Main.UI:Update()
@@ -1085,7 +1095,7 @@ function Main.Game:GetWinners()
 		
 		table.insert( pots, { amount = amount, players = players, winners = {} } )
 	end
-	 
+	
 	for k,v in pairs( pots ) do
 	
 		local bestrank = 0
@@ -1133,11 +1143,12 @@ function Main.Game:DealHand()
 	-- emote: deals a new hand. <a> and <b> place the blinds (1000g)
 	
 	self.hand_complete = false
-	self.round  = "PREFLOP"
-	self.raises = 0
-	self.bet    = self.ante + self.big_blind
-	self.pot    = 0
-	self.table  = {}
+	self.round         = "PREFLOP"
+	self.raises        = 0
+	self.bet           = self.ante + self.big_blind
+	self.pot           = 0
+	self.riverbet      = nil
+	self.table         = {}
 	
 	self:NewDeck()
 	

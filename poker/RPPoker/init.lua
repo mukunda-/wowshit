@@ -11,6 +11,9 @@ Main.cprefix = "RPPOKER"
 -------------------------------------------------------------------------------
 function Main:OnInitialize()
 	self.Config:InitDB()
+	
+	Main.Game:ResetGame()
+	
 	if self.Config.db.char.state then
 		--Main.Game:LoadState( self.Config.db.char.state )
 	end

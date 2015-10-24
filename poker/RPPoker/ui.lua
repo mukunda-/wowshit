@@ -334,6 +334,7 @@ function Main.UI:Update()
 	if not Main.Game.round_complete and Main.Game.round ~= "SHOWDOWN" then
 	
 		self.pactions.call:SetDisabled( false )
+		self.pactions.bet:SetDisabled( false )
 		local p = Main.Game:CurrentPlayer()
 		local ca = Main.Game:CallAmount(p)
 		
