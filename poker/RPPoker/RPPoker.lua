@@ -529,6 +529,8 @@ end
 --
 function Main.Game:PlayerCall()
 	local p = self:CurrentPlayer()
+	assert( not p.folded )
+	assert( not p.acted )
 	
 	if self:CallAmount(p) == 0 then
 		Main:Print( "Player must check, not call." )
@@ -557,6 +559,7 @@ end
 function Main.Game:PlayerCheck()
 	local p = self:CurrentPlayer()
 	assert( not p.folded )
+	assert( not p.acted )
 	
 	if self.round_complete then	
 		Main:Print( "The round has ended." )
@@ -586,6 +589,7 @@ end
 function Main.Game:PlayerBet( amount )
 	local p = self:CurrentPlayer()
 	assert( not p.folded )
+	assert( not p.acted )
 	
 	if self.round_complete then	
 		Main:Print( "The round has ended." )
@@ -622,6 +626,7 @@ end
 function Main.Game:PlayerRaise( amount )
 	local p = self:CurrentPlayer()
 	assert( not p.folded )
+	assert( not p.acted )
 	
 	if self.round_complete then	
 		Main:Print( "The round has ended." )
@@ -629,7 +634,7 @@ function Main.Game:PlayerRaise( amount )
 	end	
 	
 	if self.raises >= self.max_raises then
-		Main:Print( "Cannot raise higher." )
+		Main:Print( "Cannot raise higher (capped)." )
 		return
 	end
 	

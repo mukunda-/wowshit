@@ -1,0 +1,24 @@
+## Interface: 60200
+## Title: UnlimitedChatMessage
+## Version: 1.9.6
+## Notes: Lets you paste long msgs into chat by spliting msg into multiple outing msgs. 
+## Author: Cyprias
+## SavedVariables: UCM_DB
+## X-Bitcoin: 12Z1ExLqeSNrrmRUW82jbt3eNjcKsaLwty
+## X-Website: http://wow.curse.com/downloads/wow-addons/details/unlimitedchatmessage.aspx
+## X-Donate: https://www.paypal.com/cgi-bin/webscr?hosted_button_id=VG3UNPDU69AG6&item_name=UnlimitedChatMessage+%28from+in+game%29&cmd=_s-xclick
+## X-License: GNU General Public License version 3 (GPLv3)
+## X-Curse-Packaged-Version: 1.9.6
+## X-Curse-Project-Name: UnlimitedChatMessage
+## X-Curse-Project-ID: unlimitedchatmessage
+## X-Curse-Repository-ID: wow/unlimitedchatmessage/mainline
+
+## LoadManagers: AddonLoader
+## X-LoadOn-Always: true
+
+#@no-lib-strip@
+embeds.xml
+#@end-no-lib-strip@
+
+locales.xml
+core.lua
