@@ -335,16 +335,19 @@ function Main.UI:Update()
 	
 		self.pactions.call:SetDisabled( false )
 		self.pactions.bet:SetDisabled( false )
+		self.pactions.betamt:SetDisabled( false )
 		local p = Main.Game:CurrentPlayer()
 		local ca = Main.Game:CallAmount(p)
 		
 		if ca == 0 then
 			self.pactions.call:SetText( "Check" )
 			self.pactions.bet:SetText( "Bet" )
+			self.pactions.fold:SetDisabled( true )
 		else
 			
 			self.pactions.call:SetText( "Call" )
 			self.pactions.bet:SetText( "Raise" )
+			self.pactions.fold:SetDisabled( false )
 			
 			if p.credit < ca then
 				self.pactions.call:SetDisabled( true )
@@ -352,10 +355,10 @@ function Main.UI:Update()
 			
 			if p.credit <= ca then
 				self.pactions.bet:SetDisabled( true )
+				self.pactions.betamt:SetDisabled( true )
 			end
 		end
-		
-		self.pactions.fold:SetDisabled( false )
+	
 		self.pactions.allin:SetDisabled( false )
 	else
 		self.pactions.call:SetDisabled( true )
@@ -371,20 +374,18 @@ function Main.UI:Update()
 		self.nextround:SetDisabled( true )
 	else
 		self.nextround:SetDisabled( false )
-		if Main.Game.hand_complete and Main.Game.round ~= "" then
-			self.nextround:SetText( "End Hand" )
-		else
-			if Main.Game.round == "" then
-				self.nextround:SetText( "Deal" )
-			elseif Main.Game.round == "PREFLOP" then
-				self.nextround:SetText( "Deal Flop" )
-			elseif Main.Game.round == "POSTFLOP" then
-				self.nextround:SetText( "Deal Turn" )
-			elseif Main.Game.round == "POSTTURN" then
-				self.nextround:SetText( "Deal River" )
-			elseif Main.Game.round == "POSTRIVER" then
-				self.nextround:SetText( "Showdown" )
-			end
+		if Main.Game.round == "" then
+			self.nextround:SetText( "Deal" )
+		elseif Main.Game.round == "PREFLOP" then
+			self.nextround:SetText( "Deal Flop" )
+		elseif Main.Game.round == "POSTFLOP" then
+			self.nextround:SetText( "Deal Turn" )
+		elseif Main.Game.round == "POSTTURN" then
+			self.nextround:SetText( "Deal River" )
+		elseif Main.Game.round == "POSTRIVER" then
+			self.nextround:SetText( "Showdown" )
+		elseif Main.Game.round == "END" then
+			self.nextround:SetText( "End" )
 		end
 	end
 	
@@ -403,11 +404,14 @@ end
 
 -------------------------------------------------------------------------------
 function Main.UI.PlayerActionBet()
+	local self = Main.UI
+	
 	local p = Main.Game:CurrentPlayer()
-	local amt = tonumber(self.pactions.betamt)
+	local amt = tonumber(self.pactions.betamt:GetText())
 	
 	if not amt or amt <= 0 then
 		Main:Print( "Invalid bet amount." )
+		return
 	end
 	
 	if Main.Game:CallAmount(p) == 0 then
@@ -427,15 +431,12 @@ function Main.UI.PlayerActionAllIn()
 	Main.Game:PlayerAllIn()
 end
 
+-------------------------------------------------------------------------------
 function Main.UI.NextRoundClicked()
-	if Main.Game.hand_complete and Main.Game.round ~= "" then
-		Main.Game:EndHand()
-	else
-		if Main.Game.round == "" then
-			Main.Game:DealHand()
-		else
-			Main.Game:NextRound()
-		end
-	end
 	
+	if Main.Game.round == "" then
+		Main.Game:DealHand()
+	else
+		Main.Game:NextRound()
+	end
 end

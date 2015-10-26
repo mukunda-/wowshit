@@ -214,10 +214,13 @@ end
 function core:SendChatMessage(...)								--
 -- Our hook to SendChatMessage. If msg is too long we split it.	--
 ------------------------------------------------------------------
-	local msg, chatType ,language ,channel = ...;
+	local msg, chatType, language, channel = ...
 	
-	if msg:sub( 1, 9 ) == "{{U|C|M}}" then 
-		core.hooks.SendChatMessage( msg:sub(10), chatType, language, channel )
+	-- we put a special flag in the chat type to determine if this message
+	-- should be sent normally
+	if chatType:sub( 1, 2 ) == "__" then 
+		core.hooks.SendChatMessage( msg, chatType:sub(3), language, channel )
+		return
 	end
 	
 	local chunks = {}
@@ -576,10 +579,11 @@ function core:SendChat( msg, type, lang, channel )
 		self:StartChat()
 	else
 		
-		_G.ChatThrottleLib:SendChatMessage( "ALERT", "UCM", "{{U|C|M}}" .. msg, type, lang, channel );
+		_G.ChatThrottleLib:SendChatMessage( "ALERT", "UCM", msg, "__" .. type, lang, channel );
 	end
 end
 
+-------------------------------------------------------------------------------
 function core:StartChat()
 	if g_chat_busy then return end
 	if #g_chat_queue == 0 then return end
@@ -598,7 +602,7 @@ function core:ChatQueue()
 	
 	local c = g_chat_queue[1]
 	
-	_G.ChatThrottleLib:SendChatMessage( "ALERT", "UCM", "{{U|C|M}}" .. c.msg, c.type, c.lang );
+	_G.ChatThrottleLib:SendChatMessage( "ALERT", "UCM", c.msg, "__" .. c.type, c.lang );
 	g_chat_timer = self:ScheduleTimer( "ChatTimeout", 10 )
 end
 
@@ -606,7 +610,8 @@ end
 function core:ChatTimeout()
 	g_chat_timer = nil
 	g_chat_queue = {}
-	print( "<Chat Timed Out!>" )
+	g_chat_busy = false
+	print( "|cffff0000<Chat Timed Out!>|r" )
 end
 
 -------------------------------------------------------------------------------
@@ -614,50 +619,54 @@ function core:ChatConfirmed()
 	self:CancelTimer( g_chat_timer )
 	g_chat_timer = nil
 	table.remove( g_chat_queue, 1 )
+	
+	self:ChatQueue()
 end
 
 -------------------------------------------------------------------------------
 function core:ChatFailed()
 	self:CancelTimer( g_chat_timer )
-	g_chat_timer = self:ScheduleTimer( "ChatFailedRetry", 3 )
+	print( "|cffff0000<chat fail retry>" )
+	g_chat_timer = self:ScheduleTimer( "ChatFailedRetry", 6 )
 end
 
 -------------------------------------------------------------------------------
 function core:ChatFailedRetry()
+	print( "|cffff00ff<chat fail retry2>" )
 	g_chat_timer = nil
-	
+	self:ChatQueue()
 end
 
 -------------------------------------------------------------------------------
-function core:OnChatMsgSay( message, sender, language, channelString, target, flags, _, channelNumber, channelName, _, counter )
+function core:OnChatMsgSay( event, message, sender, language, channelString, target, flags, _, channelNumber, channelName, _, counter )
 
 	if #g_chat_queue == 0 then return end
 	local cq = g_chat_queue[1]
 	if cq.type ~= "SAY" then return end
-	
-	if sender == UnitName( "player" ) then
-		if cq.msg == message then
+ 
+	if target == UnitName( "player" ) then
+	--	if cq.msg == message then
 			self:ChatConfirmed()
-		end
+	--	end
 	end
 end
 
 -------------------------------------------------------------------------------
-function core:OnChatMsgEmote( message, sender, language, channelString, target, flags, _, channelNumber, channelName, _, counter )
+function core:OnChatMsgEmote( event, message, sender, language, channelString, target, flags, _, channelNumber, channelName, _, counter )
 
 	if #g_chat_queue == 0 then return end
 	local cq = g_chat_queue[1]
-	if cq.type ~= "SAY" then return end
+	if cq.type ~= "EMOTE" then return end
 	
-	if sender == UnitName( "player" ) then
-		if cq.msg == message then
+	if target == UnitName( "player" ) then
+	--	if cq.msg == message then
 			self:ChatConfirmed()
-		end
+	--	end
 	end
 end
 
 -------------------------------------------------------------------------------
-function core:OnChatMsgSystem( message, sender, language, channelString, target, flags, _, channelNumber, channelName, _, counter )
+function core:OnChatMsgSystem( event, message, sender, language, channelString, target, flags, _, channelNumber, channelName, _, counter )
 
 	if #g_chat_queue == 0 then return end
 	

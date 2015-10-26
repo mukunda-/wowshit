@@ -20,6 +20,7 @@ local EMOTES = {
 Main.Emote = {
 	panel = nil;
 	text  = "";
+	lastadd = 0;
 }
 
 local Module = Main.Emote
@@ -81,7 +82,7 @@ function Module:Reset()
 	self.text = ""
 end
 
------------------------w--------------------------------------------------------
+-------------------------------------------------------------------------------
 function Module:Add( text, ... )
 	if select( "#", ... ) ~= 0 then
 		text = string.format( text, ... )
@@ -89,6 +90,11 @@ function Module:Add( text, ... )
 	if self.text ~= "" then
 		self.text = self.text .. " "
 	end
+	
+	if GetTime() - self.lastadd > 1.0 then
+		self.text = ""
+	end
+	
 	self.text = self.text .. text
 	self:ResetEditbox()
 	self:ShowPanel()

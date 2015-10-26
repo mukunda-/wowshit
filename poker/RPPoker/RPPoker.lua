@@ -411,13 +411,15 @@ end
 -- If they have insufficient funds then it marks them as all-in and
 -- bets as much as they have.
 --
-function Main.Game:AddBet( player, amount )
+function Main.Game:AddBet( player, amount, allowover )
 	
 	-- player goes all in if they cant afford the bet
 	-- take care to not allow players to bet higher than they own
 	-- the clipping is only for antes and blinds
 	
+	
 	if player.credit < amount then
+	
 		amount = player.credit
 		player.allin = true
 		player.acted = true
@@ -433,6 +435,20 @@ function Main.Game:AddBet( player, amount )
 		player.acted = true
 	end
 	
+end
+
+function Main.Game:Refund( player, amount )
+	player.credit = player.credit + amount
+	player.bet = player.bet - amount
+	
+	self.bet = 0
+	
+	Main:PartyPrint( "%s was refunded %sg since nobody else could match their bet.", player.alias, amount )
+	
+	-- reset the bet cap
+	for _,p in pairs( self.players ) do
+		self.bet = math.max( p.bet )
+	end
 end
 
 -------------------------------------------------------------------------------
@@ -606,11 +622,16 @@ function Main.Game:PlayerBet( amount )
 		return
 	end
 	
+	if amount > p.credit then
+		Main:Print( "Insufficient funds." )
+		return
+	end
+	
 	self:PushHistory( "Player Bet" )
 	
 	self:ResetActed()
 	p.acted = true
-	self:AddBet( amount )
+	self:AddBet( p, amount )
 	
 	self:ContinueBettingRound()
 	
@@ -633,7 +654,7 @@ function Main.Game:PlayerRaise( amount )
 		return
 	end	
 	
-	if self.raises >= self.max_raises then
+	if self.raises >= Main.Config.db.profile.max_raises then
 		Main:Print( "Cannot raise higher (capped)." )
 		return
 	end
@@ -643,7 +664,7 @@ function Main.Game:PlayerRaise( amount )
 		return
 	end
 	
-	amount = amount + CallAmount(p)
+	amount = amount + self:CallAmount(p)
 	if amount > p.credit then
 		Main:Print( "Insufficient credit." )
 		return
@@ -766,9 +787,7 @@ function Main.Game:ContinueBettingRound()
 		self.round_complete = true 
 		return
 	end
-	
-	
-	
+	 
 	-- find next turn
 	while( not self:AllPlayersActed() ) do
 		local p = self:CurrentPlayer()
@@ -794,9 +813,7 @@ function Main.Game:DealFlop()
 	self.round = "POSTFLOP"
 	for i = 1,3 do table.insert( self.table, self:DrawCard() ) end
 	self:StartBettingRound( true )
-	
-	
-	Main.Emote:Reset()
+	 
 	Main.Emote:AddTemplate( "FLOP", self:CardName( self.table[1] ),
 						            self:CardName( self.table[2] ), 
 						            self:CardName( self.table[3] ))
@@ -818,8 +835,7 @@ function Main.Game:DealTurn()
 	self.round = "POSTTURN"
 	table.insert( self.table, self:DrawCard() )
 	self:StartBettingRound( true )
-	
-	Main.Emote:Reset()
+	 
 	Main.Emote:AddTemplate( "TURN", self:CardName( self.table[1] ),
 						            self:CardName( self.table[2] ), 
 						            self:CardName( self.table[3] ), 
@@ -842,8 +858,7 @@ function Main.Game:DealRiver()
 	self.round = "POSTRIVER"
 	table.insert( self.table, self:DrawCard() )
 	self:StartBettingRound( true )
-	
-	Main.Emote:Reset()
+	 
 	Main.Emote:AddTemplate( "RIVER", self:CardName( self.table[1] ),
 						             self:CardName( self.table[2] ), 
 						             self:CardName( self.table[3] ), 
@@ -871,6 +886,10 @@ local function CommaList( list )
 	return text
 end
 
+-------------------------------------------------------------------------------
+-- Returns a comma separated list of entries from an array as a string with
+-- 'and' as the last separator.
+--
 local function CommaAndList( list )
 	
 	local text = ""
@@ -888,16 +907,15 @@ local function CommaAndList( list )
 end
 
 -------------------------------------------------------------------------------
-function Main.Game:DoShowdown()
+-- Process winners and give refunds to players who have bet too much.
+--
+-- @param final If this is done during the showdown and players are revealing
+--              their cards. Otherwise, only pots that have one player left
+--              are awarded.
+--
+function Main.Game:ProcessWinners( final )
 	
-	assert( self.round == "POSTRIVER" and self:AllPlayersActed() )
-	self:PushHistory( "Showdown" )
-	
-	Main:PartyPrint( "**SHOWDOWN**" )
-	
-	local iswinner = {}
-	
-	Main.Emote:Reset()
+	local iswinner = {} 
 	
 	local wins = self:GetWinners()
 	
@@ -936,14 +954,14 @@ function Main.Game:DoShowdown()
 		
 		local rankname = Main:FormatRank( v.rank )
 		
-		Main:PartyPrint( string.format( "%sWINNER%s (%s): %s WITH %s", 
-										string.upper(potname),
-										#v.winners == 1 and "" or "S",
-										v.amount .. "g",
-										winner_names,
-										string.upper(rankname) ))
+		Main:PartyPrint( "%sWINNER%s (%s): %s WITH %s", 
+							string.upper(potname),
+							#v.winners == 1 and "" or "S",
+							v.amount .. "g",
+							winner_names,
+							string.upper(rankname) )
 										 
-		if #wins == 1 and #v.winners == 1 then
+		if #wins == 1 then
 			if #v.winners == 1 then
 				Main.Emote:Add( "%s wins the hand (%sg) with %s.",
 								 winner_and_names, v.amount, rankname )
@@ -995,17 +1013,51 @@ function Main.Game:DoShowdown()
 				Main:PartyPrint( "%s: %s", p.alias, string.upper( rank ))
 				Main.Emote:Add( "%s had %s.", rank )
 			else
-				Main:PartyPrint( "%s: MUCKED" )
+				Main:PartyPrint( "%s: MUCKED", p.alias )
 				Main.Emote:Add( "%s mucked %s hand.", rank, p.male and "his" or "her" )
 			end
 		end
 	end
+end
+
+-------------------------------------------------------------------------------
+function Main.Game:DoShowdown()
 	
-	self.hand_complete = true
-	self.round_complete = true
+	assert( self.round == "POSTRIVER" and self:AllPlayersActed() )
+	self:PushHistory( "Showdown" )
+	
+	Main:PartyPrint( "**SHOWDOWN**" )
+	
+	ProcessWinners( true )
+	
+	
 	self.round = ""
+	self.round_complete = true
+	self.hand_complete = true
 	
 	self:SaveState()
+	Main.UI:Update()
+end
+
+-------------------------------------------------------------------------------
+function Main.Game:EndHand()
+	assert( not self.hand_complete )
+	
+	self:PushHistory( "End Hand" )
+	
+	self.hand_complete = true
+	self.round = ""
+	for _,p in pairs( self.players ) do 
+		p.bet = 0
+	end
+	
+	self:SaveState()
+	
+--[[	self:CheckPots()
+	
+	if self:ActivePlayers() == 1 then
+		--  ??winner
+	end]]
 	Main.UI:Update()
 end
 
@@ -1023,6 +1075,7 @@ function Main.Game:NextRound()
 		self:PushHistory( "Ended Hand" )
 		
 		self.hand_complete = true
+		self.round = "END"
 		-- distribute pot
 		
 		self:SaveState()
@@ -1037,19 +1090,8 @@ function Main.Game:NextRound()
 		self:DealRiver()
 	elseif self.round == "POSTRIVER" then
 		self:DoShowdown()
-	end
-end
-
--------------------------------------------------------------------------------
-function Main.Game:EndHand()
-	assert( not self.hand_complete )
-	
-	self.hand_complete = true
-	
-	self:CheckPots()
-	
-	if self:ActivePlayers() == 1 then
-		--  ??winner
+	elseif self.round == "END" then
+		self:EndHand()
 	end
 end
 
@@ -1058,10 +1100,33 @@ end
 --
 function Main.Game:CheckPots()
 	
+	for _,player in pairs( self.players ) do
+		
+		local maxbet = 0
+		for _, player2 in pairs( self.players ) do
+			if player ~= player2 then
+				
+				maxbet = math.max( maxbet, player2.bet )
+			end
+		end
+		
+		if maxbet < player.bet then
+			-- nobody has matched this player's bet, give a refund.
+			self:Refund( player, player.bet - maxbet )
+			self:CheckPots()
+			return
+			
+		end	
+	end
 end
 
 -------------------------------------------------------------------------------
-function Main.Game:GetWinners()
+-- Get the winners of the different pots
+--
+-- @param rank true to process card ranks, false to just populate a list of
+--             pots and eligible players.
+--
+function Main.Game:GetWinners( ranks )
 	local winners = {}
 	local bet2 = {}
 	
@@ -1076,6 +1141,7 @@ function Main.Game:GetWinners()
 		local bet = 0
 		local amount = 0
 		local players = {}
+		local allplayers = {}
 		for k,v in pairs( self.players ) do
 			if bet2[k] > 0 then
 				if bet == 0 then 
@@ -1092,28 +1158,36 @@ function Main.Game:GetWinners()
 			if bet2[k] > 0 then
 				bet2[k] = bet2[k] - bet
 				amount = amount + bet
+				table.insert( allplayers, k )
 				if not v.folded then
 					table.insert( players, k )
 				end
 			end
 		end
 		
-		table.insert( pots, { amount = amount, players = players, winners = {} } )
+		table.insert( pots, { 
+			amount = amount; -- amount in the pot
+			players = players; -- eligible players
+			all = allplayers; -- all players who have contributed
+		})
 	end
 	
-	for k,v in pairs( pots ) do
-	
-		local bestrank = 0
-		
-		for _,p in pairs( v.players ) do
-			bestrank = math.max( self.players[p].rank, bestrank )
-		end
-		
-		v.rank = bestrank
-		
-		for _,p in pairs( v.players ) do
-			if self.players[p].rank == bestrank then
-				table.insert( v.winners, p )
+	if ranks then
+		for _,v in pairs( pots ) do
+			v.winners = {}; -- player or players that win the pot with the best cards
+			
+			local bestrank = 0
+			
+			for _,p in pairs( v.players ) do
+				bestrank = math.max( self.players[p].rank, bestrank )
+			end
+			
+			v.rank = bestrank
+			
+			for _,p in pairs( v.players ) do
+				if self.players[p].rank == bestrank then
+					table.insert( v.winners, p )
+				end
 			end
 		end
 	end
@@ -1221,7 +1295,7 @@ function Main.Game:AdjustCredit( player, amount )
 	local p = self:GetPlayer( player )
 	if not p then return end
 	
-	if not self.hand_complete and p.folded or p.allin then
+	if not self.hand_complete then
 		Main:Print( "Cannot add credit to player right now." )
 		return
 	end
@@ -1267,7 +1341,7 @@ function Main.Game:PrintTableCards()
 		cards = cards .. self:CardName( v )
 	end
 	
-	Main:PartyPrint( "TABLE CARDS: " .. cards )
+	Main:PartyPrint( "TABLE CARDS: %s", cards )
 end
 
 -------------------------------------------------------------------------------
@@ -1318,7 +1392,12 @@ function Main:Print( text, ... )
 end
 
 -------------------------------------------------------------------------------
-function Main:PartyPrint( text )
+function Main:PartyPrint( text, ... )
+
+	if select( "#", ... ) ~= 0 then
+		text = string.format( text, ... )
+	end
+	
 	local channel
 	
 	if IsInRaid() then

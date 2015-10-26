@@ -139,7 +139,7 @@ local methods = {
 			end
 			
 			if player.folded then
-				if player.bet == 0 then
+				if player.bet > 0 then
 					self.frame.text_status:SetText( "FOLDED" )
 				else
 					self.frame.text_status:SetText( "BREAK" )
