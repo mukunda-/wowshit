@@ -626,13 +626,13 @@ end
 -------------------------------------------------------------------------------
 function core:ChatFailed()
 	self:CancelTimer( g_chat_timer )
-	print( "|cffff0000<chat fail retry>" )
-	g_chat_timer = self:ScheduleTimer( "ChatFailedRetry", 6 )
+	print( "|cffff0000<chat failed..waiting>" )
+	g_chat_timer = self:ScheduleTimer( "ChatFailedRetry", 3 )
 end
 
 -------------------------------------------------------------------------------
 function core:ChatFailedRetry()
-	print( "|cffff00ff<chat fail retry2>" )
+	print( "|cffff00ff<resending>" )
 	g_chat_timer = nil
 	self:ChatQueue()
 end
