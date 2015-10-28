@@ -356,6 +356,8 @@ function Main:UpdatePlayerRank( player )
 end
 
 -------------------------------------------------------------------------------
+-- Returns a rank's name
+--
 function Main:FormatRank( rank )
 	local r = math.floor(rank / 1048576)
 	return RankStrings[r]
