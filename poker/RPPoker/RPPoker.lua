@@ -514,9 +514,22 @@ end
 --
 function Main.Game:ActivePlayers() 
 	local count = 0
-	for k,v in pairs(self.players) do
-		if not v.folded then
+	for _,p in pairs(self.players) do
+		if not p.folded then
 			count = count + 1 
+		end
+	end
+	return count
+end
+
+-------------------------------------------------------------------------------
+-- Returns the amount of playres that aren't folded or all-in.
+--
+function Main.Game:ActingPlayers()
+	local count = 0
+	for _,p in pairs( self.players ) do
+		if not p.folded and not p.allin then
+			count = count + 1
 		end
 	end
 	return count
@@ -755,8 +768,8 @@ end
 -- Returns true if all players have "acted" during the current round.
 --
 function Main.Game:AllPlayersActed()
-	for i = 1, #self.players do
-		if not self.players[i].acted then return false end
+	for _,p in pairs( self.players ) do
+		if not p.acted then return false end
 	end
 	
 	return true
@@ -782,12 +795,12 @@ end
 -------------------------------------------------------------------------------
 function Main.Game:ContinueBettingRound()
 
-	if self:ActivePlayers() == 1 then
-		-- everyone else folded.
-		self.round_complete = true 
+	if self:ActivePlayers() == 1 or self:ActingPlayers() == 1 then
+		-- everyone else folded or cannot do anything further.
+		self.round_complete = true
 		return
 	end
-	 
+	
 	-- find next turn
 	while( not self:AllPlayersActed() ) do
 		local p = self:CurrentPlayer()
@@ -908,12 +921,8 @@ end
 
 -------------------------------------------------------------------------------
 -- Process winners and give refunds to players who have bet too much.
---
--- @param final If this is done during the showdown and players are revealing
---              their cards. Otherwise, only pots that have one player left
---              are awarded.
---
-function Main.Game:ProcessWinners( final )
+-- 
+function Main.Game:ProcessWinners()
 	
 	local iswinner = {} 
 	
@@ -1028,8 +1037,7 @@ function Main.Game:DoShowdown()
 	
 	Main:PartyPrint( "**SHOWDOWN**" )
 	
-	ProcessWinners( true )
-	
+	ProcessWinners( true ) 
 	
 	self.round = ""
 	self.round_complete = true
