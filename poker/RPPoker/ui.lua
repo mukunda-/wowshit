@@ -259,7 +259,7 @@ function Main.UI:AdjustCredit( player )
 	
 	self.adjustcredit.player = player
 	self.adjustcredit.name:SetText( label )
-	self.adjustcredit.amount:SetText( 0 )
+	self.adjustcredit.amount:SetText( "" )
 	self.adjustcredit.frame:Show()
 end
 

@@ -523,16 +523,27 @@ function Main.Game:ActivePlayers()
 end
 
 -------------------------------------------------------------------------------
--- Returns the amount of playres that aren't folded or all-in.
+-- If there's only one player remaining that can act (the rest are all-in or
+-- folded), then make them check.
 --
-function Main.Game:ActingPlayers()
+function Main.Game:AutoCheck()
+	local player = self:CurrentPlayer()
+	
+	if self:CallAmount(player) > 0 then 
+		-- they haven't matched the bet yet
+		return false 
+	end
+	
 	local count = 0
 	for _,p in pairs( self.players ) do
-		if not p.folded and not p.allin then
-			count = count + 1
+		if p ~= player and not p.folded and not p.allin then
+			-- there is another player that can act
+			return false
 		end
 	end
-	return count
+	
+	player.acted = true
+	return true
 end
 
 -------------------------------------------------------------------------------
@@ -795,8 +806,8 @@ end
 -------------------------------------------------------------------------------
 function Main.Game:ContinueBettingRound()
 
-	if self:ActivePlayers() == 1 or self:ActingPlayers() == 1 then
-		-- everyone else folded or cannot do anything further.
+	if self:ActivePlayers() == 1 then
+		-- everyone else folded.
 		self.round_complete = true
 		return
 	end
@@ -810,9 +821,13 @@ function Main.Game:ContinueBettingRound()
 			break
 		end
 	end
-	
+	 
 	if self:AllPlayersActed() then
 		self.round_complete = true
+	else
+		if self:AutoCheck() then
+			self.round_complete = true
+		end
 	end
 end
 
@@ -926,7 +941,7 @@ function Main.Game:ProcessWinners()
 	
 	local iswinner = {} 
 	
-	local wins = self:GetWinners()
+	local wins = self:GetWinners( true )
 	
 	for potnum,v in ipairs( wins ) do
 		local winner_and_names = {}
@@ -1037,7 +1052,7 @@ function Main.Game:DoShowdown()
 	
 	Main:PartyPrint( "**SHOWDOWN**" )
 	
-	ProcessWinners( true ) 
+	self:ProcessWinners( true ) 
 	
 	self.round = ""
 	self.round_complete = true
