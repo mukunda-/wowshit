@@ -9,10 +9,17 @@ local EMOTES = {
 		{ text = "burns a card and deals the flop: {1}, {2}, and {3}." };
 	};
 	TURN = {
-		{ text = "burns a card and deals the turn: {4}. The cards on the table now being: {1}, {2}, {3}, and {4}." };
+		{ text = "burns a card and deals the turn, the cards on the table now being: {1}, {2}, {3}, and {4}." };
 	};
 	RIVER = {
-		{ text = "burns a card and deals the river: {5}. The cards on the table now being: {1}, {2}, {3}, {4}, and {5}." };
+		{ text = "burns a card and deals the river, the cards on the table now being: {1}, {2}, {3}, {4}, and {5}." };
+	};
+	DEALREST = {
+		{ text = "deals the rest of the table cards, the cards on the table now being: {1}, {2}, {3}, {4}, and {5}." };
+	};
+	
+	ELIM = {
+		{ text = "{1} is the only player remaining and wins the hand ({2}g)." };
 	};
 }
 
@@ -21,6 +28,7 @@ Main.Emote = {
 	panel = nil;
 	text  = "";
 	lastadd = 0;
+	lastsend = 0;
 }
 
 local Module = Main.Emote
@@ -94,6 +102,7 @@ function Module:Add( text, ... )
 	if GetTime() - self.lastadd > 1.0 then
 		self.text = ""
 	end
+	self.lastadd = GetTime()
 	
 	self.text = self.text .. text
 	self:ResetEditbox()
@@ -107,7 +116,9 @@ end
 
 -------------------------------------------------------------------------------
 function Module:Send()
+	if GetTime() < self.lastsend + 3.0 then return end
+	self.lastsend = GetTime()
+	
 	self.text = self.editbox:GetText()
-	Main:SendChatMessage( self.editbox:GetText(), "EMOTE" )
-	print( self.text )
+	SendChatMessage( self.editbox:GetText(), "EMOTE" ) 
 end

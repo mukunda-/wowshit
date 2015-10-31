@@ -8,6 +8,8 @@ Main.UI = {
 	players = {};
 }
 
+local Module = Main.UI
+
 -------------------------------------------------------------------------------
 function Main.UI:Init() 
  
@@ -83,15 +85,42 @@ function Main.UI:Init()
 	playeractions:AddChild( e )
 	self.pactions.allin = e
 	
-	
 	e = AceGUI:Create( "Button" )
 	e:SetText( "Next Round" )
 	e:SetCallback( "OnClick", self.NextRoundClicked )
 	f:AddChild( e )
 	self.nextround = e
 	
-	self.frame = f
-	 
+	self.options = {}
+	local options = AceGUI:Create( "InlineGroup" )
+	options:SetTitle( "Options" )
+	options:SetLayout( "Flow" )
+	options:SetFullWidth( true )
+	f:AddChild( options )
+	self.options.frame = options
+	
+	e = AceGUI:Create( "EditBox" )
+	e:SetLabel( "Ante" )
+	e:SetWidth( 80 )
+	e:SetCallback( "OnEnterPressed", self.AnteEdited )
+	options:AddChild( e )
+	self.options.ante = e
+	
+	e = AceGUI:Create( "EditBox" )
+	e:SetLabel( "Small Blind" )
+	e:SetWidth( 80 )
+	e:SetCallback( "OnEnterPressed", self.SmallBlindEdited )
+	options:AddChild( e )
+	self.options.smallblind = e
+	
+	e = AceGUI:Create( "EditBox" )
+	e:SetLabel( "Big Blind" )
+	e:SetWidth( 80 )
+	e:SetCallback( "OnEnterPressed", self.BigBlindEdited )
+	options:AddChild( e )
+	self.options.bigblind = e
+	
+	self.frame = f 
 end
  
 -------------------------------------------------------------------------------
@@ -384,12 +413,26 @@ function Main.UI:Update()
 			self.nextround:SetText( "Deal River" )
 		elseif Main.Game.round == "POSTRIVER" then
 			self.nextround:SetText( "Showdown" )
-		elseif Main.Game.round == "END" then
-			self.nextround:SetText( "End" )
+		elseif Main.Game.round == "ELIMINATED" then
+			self.nextround:SetText( "Eliminated" )
 		end
 	end
 	
 	self.frame:SetStatusText( "ROUND: " .. Main.Game.round )
+	
+	self.options.ante:SetText( Main.Game.ante )
+	self.options.smallblind:SetText( Main.Game.small_blind )
+	self.options.bigblind:SetText( Main.Game.big_blind )
+	
+	if Main.Game.hand_complete then
+		self.options.ante:SetDisabled( false )
+		self.options.smallblind:SetDisabled( false )
+		self.options.bigblind:SetDisabled( false )
+	else
+		self.options.ante:SetDisabled( true )
+		self.options.smallblind:SetDisabled( true )
+		self.options.bigblind:SetDisabled( true )
+	end
 end
 
 -------------------------------------------------------------------------------
@@ -439,4 +482,19 @@ function Main.UI.NextRoundClicked()
 	else
 		Main.Game:NextRound()
 	end
+end
+
+-------------------------------------------------------------------------------
+function Module.AnteEdited( text )
+	Main.Game:SetBettingOption( "ante", Main.UI.options.ante:GetText(), "Change Ante" )
+end
+
+-------------------------------------------------------------------------------
+function Module.SmallBlindEdited( text )
+	Main.Game:SetBettingOption( "small_blind", Main.UI.options.smallblind:GetText(), "Change Small Blind" )
+end
+
+-------------------------------------------------------------------------------
+function Module.BigBlindEdited( text )
+	Main.Game:SetBettingOption( "big_blind", Main.UI.options.bigblind:GetText(), "Change Big Blind" )
 end

@@ -87,6 +87,9 @@ Main.CARD_NAMES = { "Ace", "Two", "Three", "Four", "Five", "Six", "Seven",
                        "Eight", "Nine", "Ten", "Jack", "Queen", "King" }
 Main.CARD_SUITS = { "Clubs", "Diamonds", "Hearts", "Spades" }
 
+Main.SMALL_CARD_NAMES = { "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K" }
+Main.SMALL_CARD_SUITS = { "c", "d", "h", "s" }
+
 -------------------------------------------------------------------------------
 Main.RANKS = {
 	ROYAL_FLUSH    = 9;
@@ -100,6 +103,40 @@ Main.RANKS = {
 	ONE_PAIR       = 1;
 	HIGH_CARD      = 0;
 }
+
+-------------------------------------------------------------------------------
+-- Returns a comma separated list of entries from an array as a string.
+--
+local function CommaList( list )
+	local text = ""
+	for _,v in ipairs( list ) do
+		if text ~= "" then
+			text = text .. ", "
+		end
+		text = text .. v
+	end
+	return text
+end
+
+-------------------------------------------------------------------------------
+-- Returns a comma separated list of entries from an array as a string with
+-- 'and' as the last separator.
+--
+local function CommaAndList( list )
+	
+	local text = ""
+	for k,v in ipairs( list ) do
+		if text ~= "" then
+			if k == #list then
+				text = text .. " and "
+			else
+				text = text .. ", "
+			end
+		end
+		text = text .. v
+	end
+	return text
+end
 
 -------------------------------------------------------------------------------
 local function CopyTable( tbl )
@@ -313,7 +350,8 @@ end
 function Main.Game:AddPlayer( name, alias, credit ) 
 
 	for k,v in pairs(self.players) do
-		if v.name == name then return end -- player already added
+		-- DEBUG BYPASS
+--		if v.name == name then return end -- player already added
 	end
 
 	Main.Game:PushHistory( "Add Player" )
@@ -352,10 +390,11 @@ function Main.Game:ResetGame()
 	--self.dealer = math.random( 1, #self.players )
 	self.pot    = 0
 	
-	self.ante        = Main.Config.db.profile.ante
-	self.small_blind = Main.Config.db.profile.small_blind
-	self.big_blind   = Main.Config.db.profile.big_blind
-	self.multiplier  = Main.Config.db.profile.multiplier
+	self.ante        = 0
+	self.small_blind = 5
+	self.big_blind   = 10
+	self.multiplier  = 1
+	self.max_raises  = Main.Config.db.profile.max_raises
 	
 end
 
@@ -366,6 +405,11 @@ function Main.Game:CardName( card )
 	local number, suit = self:CardValue( card )
 	
 	return Main.CARD_NAMES[number] .. " of " .. Main.CARD_SUITS[suit]
+end
+
+function Main.Game:SmallCardName( card )
+	local number, suit = self:CardValue( card )
+	return Main.SMALL_CARD_NAMES[number] .. Main.SMALL_CARD_SUITS[suit]
 end
 
 -------------------------------------------------------------------------------
@@ -393,16 +437,48 @@ end
 -- @param player Player data.
 --
 function Main.Game:TellCards( player )
-	
-	print( "tellcards", player.name, player.hand[1], player.hand[2] )
-	local msg = string.format( "<EP> Your cards: %s, %s. Credit: %dg",
+	 
+	local msg = string.format( "<EP> Your cards: %s / %s (%s, %s). Credit: %dg",
+							   self:SmallCardName( player.hand[1] ),
+							   self:SmallCardName( player.hand[2] ),
 							   self:CardName( player.hand[1] ), 
 							   self:CardName( player.hand[2] ),
 							   player.credit )
 	
 	SendChatMessage( msg, "WHISPER", _, player.name )
-	--self:SendChatMessage( msg, "WHISPER", player.name )
 	
+end
+
+-------------------------------------------------------------------------------
+function Main.Game:TellActions()
+	local p = self:CurrentPlayer()
+	
+	local msg = "<EP> CREDIT: " .. p.credit .. "g || ACTIONS: "
+	
+	local actions = {}
+	
+	local ca = self:CallAmount(p)
+	if ca == 0 then
+		table.insert( actions, "Check" )
+		table.insert( actions, "Bet" )
+	else
+		
+		if p.credit <= ca then
+			table.insert( actions, "All-In" )
+		else
+			table.insert( actions, string.format( "Call (%sg)", ca ) )
+			
+			if self.raises < self.max_raises then
+				table.insert( actions, "Raise" )
+			end
+		end
+		
+		table.insert( actions, "Fold" )
+	end
+	
+	msg = msg .. CommaList( actions )
+	
+	SendChatMessage( msg, "WHISPER", _, p.name )
 end
 
 -------------------------------------------------------------------------------
@@ -411,7 +487,7 @@ end
 -- If they have insufficient funds then it marks them as all-in and
 -- bets as much as they have.
 --
-function Main.Game:AddBet( player, amount, allowover )
+function Main.Game:AddBet( player, amount, noraise )
 	
 	-- player goes all in if they cant afford the bet
 	-- take care to not allow players to bet higher than they own
@@ -426,7 +502,10 @@ function Main.Game:AddBet( player, amount, allowover )
 	end
 	
 	player.bet = player.bet + amount
-	self.bet = math.max( self.bet, player.bet )
+	
+	if not noraise then
+		self.bet = math.max( self.bet, player.bet )
+	end
 	
 	player.credit = player.credit - amount
 	
@@ -437,15 +516,19 @@ function Main.Game:AddBet( player, amount, allowover )
 	
 end
 
+-------------------------------------------------------------------------------
 function Main.Game:Refund( player, amount )
 	player.credit = player.credit + amount
 	player.bet = player.bet - amount
+	if player.credit > 0 then
 	
-	self.bet = 0
+		player.allin = false
+	end
 	
 	Main:PartyPrint( "%s was refunded %sg since nobody else could match their bet.", player.alias, amount )
 	
-	-- reset the bet cap
+	-- reset the bet cap, not sure if this is necessary.
+	self.bet = 0
 	for _,p in pairs( self.players ) do
 		self.bet = math.max( p.bet )
 	end
@@ -520,6 +603,37 @@ function Main.Game:ActivePlayers()
 		end
 	end
 	return count
+end
+
+-------------------------------------------------------------------------------
+-- Returns true if no more players can perform actions during the hand.
+--
+function Main.Game:CheckNoActionsLeft() 
+	local count = 0
+	
+	local found
+	
+	for _,p in pairs(self.players) do
+		if not p.folded and not p.allin then
+		
+			found = p
+			if self:CallAmount(p) ~= 0 then 
+				-- this player hasn't matched the bet yet, so they
+				-- need to act.
+				return false 
+			end
+			count = count + 1
+		end
+	end
+	
+	if count < 2 then
+		-- the round should end
+		for _,p in pairs( self.players ) do
+			p.acted = true
+		end
+		return true
+	end
+	
 end
 
 -------------------------------------------------------------------------------
@@ -678,7 +792,7 @@ function Main.Game:PlayerRaise( amount )
 		return
 	end	
 	
-	if self.raises >= Main.Config.db.profile.max_raises then
+	if self.raises >= self.max_raises then
 		Main:Print( "Cannot raise higher (capped)." )
 		return
 	end
@@ -695,6 +809,8 @@ function Main.Game:PlayerRaise( amount )
 	end
 	
 	self:PushHistory( "Player Raise" )
+	
+	self.raises = self.raises + 1
 	
 	self:ResetActed()
 	p.acted = true
@@ -721,6 +837,7 @@ function Main.Game:PlayerFold()
 	self:PushHistory( "Player Fold" )
 	
 	p.folded = true
+	p.acted = true
 	self:ContinueBettingRound()
 	
 	self:SaveState()
@@ -741,16 +858,19 @@ function Main.Game:PlayerAllIn()
 	
 	self:PushHistory( "Player All-In" )
 	
+	local noraise = true
+	
 	if p.credit > self:CallAmount(p) then
 		local raise = p.credit - self:CallAmount(p)
 		
 		-- full raise rule
 		if raise > self.big_blind then
 			self:ResetActed()
+			noraise = false
 		end
 	end
 	
-	self:AddBet( p, p.credit )
+	self:AddBet( p, p.credit, noraise )
 	p.acted = true
 	
 	self:ContinueBettingRound()
@@ -806,9 +926,20 @@ end
 -------------------------------------------------------------------------------
 function Main.Game:ContinueBettingRound()
 
+	assert( not self.round_complete )
+
 	if self:ActivePlayers() == 1 then
 		-- everyone else folded.
+		self.round = "ELIMINATED"
 		self.round_complete = true
+		Main:ClearTurnTarget()
+		return
+	end
+	
+	if self:CheckNoActionsLeft() then
+		self.round = "POSTRIVER"
+		self.round_complete = true
+		Main:ClearTurnTarget()
 		return
 	end
 	
@@ -824,10 +955,15 @@ function Main.Game:ContinueBettingRound()
 	 
 	if self:AllPlayersActed() then
 		self.round_complete = true
-	else
+	--[[else -- replaced by CheckNoActionsLeft()
 		if self:AutoCheck() then
 			self.round_complete = true
-		end
+		end]]
+		
+		Main:ClearTurnTarget()
+	else
+		self:TellActions()
+		Main:SetTurnTarget( self:CurrentPlayer().name )
 	end
 end
 
@@ -845,7 +981,7 @@ function Main.Game:DealFlop()
 	Main.Emote:AddTemplate( "FLOP", self:CardName( self.table[1] ),
 						            self:CardName( self.table[2] ), 
 						            self:CardName( self.table[3] ))
-						
+	
 	Main:PartyPrint( "**FLOP DEALT**" )
 	self:PrintTableCards()
 	
@@ -864,7 +1000,7 @@ function Main.Game:DealTurn()
 	table.insert( self.table, self:DrawCard() )
 	self:StartBettingRound( true )
 	 
-	Main.Emote:AddTemplate( "TURN", self:CardName( self.table[1] ),
+	Main.Emote:AddTemplate( "TURN", self:CardName( self.table[1] ), 
 						            self:CardName( self.table[2] ), 
 						            self:CardName( self.table[3] ), 
 						            self:CardName( self.table[4] ) )
@@ -881,7 +1017,7 @@ function Main.Game:DealRiver()
 	assert( self.round == "POSTTURN" and self:AllPlayersActed() )
 	
 	self:PushHistory( "Deal River" )
-	self:DrawCard() -- burn and turn
+	self:DrawCard()
 	
 	self.round = "POSTRIVER"
 	table.insert( self.table, self:DrawCard() )
@@ -901,38 +1037,34 @@ function Main.Game:DealRiver()
 end
 
 -------------------------------------------------------------------------------
--- Returns a comma separated list of entries from an array as a string.
+-- Deal the remaining cards on the table if they aren't there.
 --
-local function CommaList( list )
-	local text = ""
-	for _,v in ipairs( list ) do
-		if text ~= "" then
-			text = text .. ", "
-		end
-		text = text .. v
+function Main.Game:DealRemainingTable()
+	if #self.table == 5 then return end
+	
+	local c = 
+	assert( #self.table == 0 or #self.table == 3 or #self.table == 4 )
+	
+	if #self.table == 0 then
+		self:DrawCard()
+		table.insert( self.table, self:DrawCard() )
+		table.insert( self.table, self:DrawCard() )
+		table.insert( self.table, self:DrawCard() ) 
 	end
-	return text
+	
+	while #self.table < 5 do
+		self:DrawCard()
+		table.insert( self.table, self:DrawCard() )
+	end
+	
+	self:PrintTableCards()
+	Main.Emote:AddTemplate( "DEALREST", self:CardName( self.table[1] ),
+						                self:CardName( self.table[2] ), 
+						                self:CardName( self.table[3] ), 
+						                self:CardName( self.table[4] ),
+						                self:CardName( self.table[5] ) )
 end
 
--------------------------------------------------------------------------------
--- Returns a comma separated list of entries from an array as a string with
--- 'and' as the last separator.
---
-local function CommaAndList( list )
-	
-	local text = ""
-	for k,v in ipairs( list ) do
-		if text ~= "" then
-			if k == #list then
-				text = text .. " and "
-			else
-				text = text .. ", "
-			end
-		end
-		text = text .. v
-	end
-	return text
-end
 
 -------------------------------------------------------------------------------
 -- Process winners and give refunds to players who have bet too much.
@@ -964,15 +1096,16 @@ function Main.Game:ProcessWinners()
 			potname = "side pot "
 			potnamef = potname
 			if #wins > 2 then
-				potname = potname .. (potnum-1) .. " "
 				potnamef = potname
 				local things = { "first", "second", "third", "fourth", 
 				                 "fifth", "sixth", "seventh", "eighth", 
 								 "nineth", "tenth", "eleventh", "twelfth", 
 								 "thirteenth", "fourteenth", "fifteenth" }
-				if things[ potnum ] then
-					potnamef = things .. potnamef
+				if things[ potnum-1 ] then
+					potnamef = things[ potnum-1 ] .. " " .. potname
 				end
+				
+				potname = potname .. (potnum-1) .. " "
 			end
 		end
 		
@@ -995,10 +1128,10 @@ function Main.Game:ProcessWinners()
 			end
 		elseif #wins > 1 then
 			if #v.winners == 1 then
-				Main.Emote:Add( "%s wins the %s(%s) with %s.", 
+				Main.Emote:Add( "%s wins the %s(%sg) with %s.", 
 			                 winner_and_names, potnamef, v.amount, rankname )
 			else
-				Main.Emote:Add( "%s split the %s(%s) with %s.", 
+				Main.Emote:Add( "%s split the %s(%sg) with %s.", 
 			                 winner_and_names, potnamef, v.amount, rankname )
 			end
 		end
@@ -1042,6 +1175,10 @@ function Main.Game:ProcessWinners()
 			end
 		end
 	end
+	
+	for _, p in pairs( self.players ) do
+		p.bet = 0
+	end
 end
 
 -------------------------------------------------------------------------------
@@ -1052,12 +1189,46 @@ function Main.Game:DoShowdown()
 	
 	Main:PartyPrint( "**SHOWDOWN**" )
 	
+	self:DealRemainingTable()
+	
 	self:ProcessWinners( true ) 
 	
 	self.round = ""
 	self.round_complete = true
 	self.hand_complete = true
 	
+	self:SaveState()
+	Main.UI:Update()
+end
+
+-------------------------------------------------------------------------------
+function Main.Game:DoEliminated()
+	assert( self.round == "ELIMINATED" )
+	self:PushHistory( "Eliminated" )
+	Main:PartyPrint( "**ELIMINATED**" )
+	
+	local winner
+	for _, p in pairs( self.players ) do
+		if not p.folded then 
+			assert( not winner ) -- debug purposes, change to a break later
+			winner = p
+		end
+	end
+	assert( winner ) -- error if we dont find a winner
+	
+	local amount = 0
+	for _, p in pairs( self.players ) do 
+		amount = amount + p.bet
+		p.bet = 0
+	end
+	
+	winner.credit = winner.credit + amount
+	Main:PartyPrint( "%s WINS (%sg).", winner.alias, amount )
+	Main.Emote:AddTemplate( "ELIM", winner.alias, amount )
+	
+	self.round = ""
+	self.round_complete = true
+	self.hand_complete = true
 	self:SaveState()
 	Main.UI:Update()
 end
@@ -1092,7 +1263,7 @@ function Main.Game:NextRound()
 	end
 	
 	self:CheckPots()
-	
+	--[[
 	if self:ActivePlayers() == 1 then
 	
 		self:PushHistory( "Ended Hand" )
@@ -1103,7 +1274,7 @@ function Main.Game:NextRound()
 		
 		self:SaveState()
 		return
-	end
+	end]]
 	
 	if self.round == "PREFLOP" then
 		self:DealFlop()
@@ -1113,8 +1284,8 @@ function Main.Game:NextRound()
 		self:DealRiver()
 	elseif self.round == "POSTRIVER" then
 		self:DoShowdown()
-	elseif self.round == "END" then
-		self:EndHand()
+	elseif self.round == "ELIMINATED" then
+		self:DoEliminated()
 	end
 end
 
@@ -1297,11 +1468,30 @@ function Main.Game:DealHand()
 	
 	self:NextTurn()
 	
+	
 	-- put up the blinds
+	local smallblind = self:CurrentPlayer()
 	self:PlayerBetSmallBlind()
 	self:NextTurn()
+	local bigblind = self:CurrentPlayer()
 	self:PlayerBetBigBlind()
 	self:NextTurn()
+	
+	Main:PartyPrint( "**NEW HAND**" )
+	
+	Main.Emote:Add( "deals a new hand." )
+	
+	if self.ante > 0 then
+		Main:PartyPrint( "ANTE: %s (%sg), %s (%sg)", smallblind.alias, self.small_blind, bigblind.alias, self.big_blind )
+		
+		Main.Emote:Add( "The ante is %sg.", self.ante )
+	end
+	
+	Main:PartyPrint( "BLINDS: %s (%sg), %s (%sg)", smallblind.alias, self.small_blind, bigblind.alias, self.big_blind )
+	
+	if self.big_blind > 0 then
+		Main.Emote:Add( "%s and %s place the blinds (%sg and %sg).", smallblind.alias, bigblind.alias, self.small_blind, self.big_blind )
+	end
 	
 	self:StartBettingRound( false )
 	
@@ -1359,9 +1549,9 @@ end
 function Main.Game:PrintTableCards()
 	local cards = ""
 	for _,v in ipairs( self.table ) do
-		if cards ~= "" then cards = cards .. ", " end
+		if cards ~= "" then cards = cards .. " / " end
 		
-		cards = cards .. self:CardName( v )
+		cards = cards .. self:SmallCardName( v )
 	end
 	
 	Main:PartyPrint( "TABLE CARDS: %s", cards )
@@ -1390,11 +1580,6 @@ function Main.Game:Reset()
 	self:LoadState( DEFAULT_STATE )
 	self:SaveState()
 	Main.UI:Update()
-end
-
--------------------------------------------------------------------------------
-function Main:SendChatMessage( text, chattype, dest )
-	ChatThrottleLib:SendChatMessage( "NORMAL", self.cprefix, text, chattype, nil, dest )
 end
  
 -------------------------------------------------------------------------------
@@ -1429,5 +1614,45 @@ function Main:PartyPrint( text, ... )
 		channel = "PARTY"
 	end
 	
-	self:SendChatMessage( text, channel )
+	SendChatMessage( text, channel )
+end
+
+-------------------------------------------------------------------------------
+function Main.Game:SetBettingOption( index, text, desc )
+	local amt = tonumber( text )
+	if not amt or amt < 0 then
+		Main:Print( "Invalid amount." )
+		Main.UI:Update()
+		return
+	end
+	
+	if not self.hand_complete then
+		Main:Print( "Cannot modify value until the hand is complete." )
+		Main.UI:Update()
+		return
+	end
+	
+	if self[index] == amt then return end
+	
+	self:PushHistory( desc )
+	self[index] = amt
+	self:SaveState()
+	Main.UI:Update()
+end
+
+local turn_target = nil
+
+-------------------------------------------------------------------------------
+function Main:SetTurnTarget( unit )
+	turn_target = unit
+	SetRaidTarget( unit, 0 )
+	SetRaidTarget( unit, self.Config.db.profile.turn_icon )
+end
+
+-------------------------------------------------------------------------------
+function Main:ClearTurnTarget()
+	if turn_target then
+		SetRaidTarget( turn_target, 0 ) 
+		turn_target = nil
+	end
 end

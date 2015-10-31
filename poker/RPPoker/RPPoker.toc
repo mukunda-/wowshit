@@ -3,6 +3,7 @@
 ## Notes: RP Poker Server
 ## Author: mukunda
 ## SavedVariables: RPPokerSaved
+## Dependencies: UnlimitedChatMessage
 ## OptionalDeps:  
 ## Version: 1.0
 
