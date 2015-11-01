@@ -35,6 +35,20 @@ local function Menu_ToggleBreak()
 end
 
 -------------------------------------------------------------------------------
+local function Menu_MoveUp()
+	Main.Game:MovePlayerUp( g_context.player )
+end
+
+-------------------------------------------------------------------------------
+local function Menu_MoveDown()
+	Main.Game:MovePlayerDown( g_context.player )
+end
+
+local function Menu_TellCards()
+	Main.Game:RetellCards( g_context.player )
+end
+
+-------------------------------------------------------------------------------
 local function InitializeMenu()
 	local info
 	
@@ -61,11 +75,13 @@ local function InitializeMenu()
 
 	
 	AddMenuButton( "Toggle Break", Menu_ToggleBreak )
-	AddSeparator()
+	AddMenuButton( "Tell Cards", Menu_TellCards )
 	AddMenuButton( "Adjust Credit", Menu_AdjustCredit )
 	 
 	AddSeparator()
-	 
+	AddMenuButton( "Move Up", Menu_MoveUp )
+	AddMenuButton( "Move Down", Menu_MoveDown )
+	AddSeparator()
 	
 	AddMenuButton( "Remove Player", Menu_RemovePlayer )
 end
@@ -124,8 +140,14 @@ local methods = {
 		end
 		
 		self.frame.text_name:SetText( nametext )
-		self.frame.text_gold:SetText( "Credit: " .. player.credit .. " |TInterface/MONEYFRAME/UI-GoldIcon:0|t" )
+		self.frame.text_gold:SetText( player.credit .. " |TInterface/MONEYFRAME/UI-GoldIcon:0|t" )
 		self.frame.text_bet:SetText( "Bet: " .. player.bet .. " |TInterface/MONEYFRAME/UI-GoldIcon:0|t" )
+		
+		if Main.Game.players[Main.Game.dealer] == player then
+			self.frame.dealerbutton:Show()
+		else
+			self.frame.dealerbutton:Hide()
+		end
 		
 		if Main.Game.hand_complete then
 			self.frame.turn:Hide()
@@ -151,8 +173,17 @@ local methods = {
 			else
 				self.frame.text_status:SetText( "" )
 			end
+			
 		end
 		
+		if player.show and player.hand[1] and player.hand[2] then
+			self.frame.text_cards:SetText( 
+					string.format( "%s / %s",
+								   Main.Game:SmallCardName( player.hand[1] ),
+								   Main.Game:SmallCardName( player.hand[2] )))
+		else
+			self.frame.text_cards:SetText( "---" )
+		end
 		
 	end;
 }
@@ -173,6 +204,13 @@ local function Constructor()
 	hot:Hide()
 	hot:SetAllPoints()
 	
+	local button = frame:CreateTexture( nil )
+	frame.dealerbutton = button
+	button:SetTexture( 0.95, 0.48, 0.05 )
+	button:SetSize( 3, 3 )
+	button:SetPoint( "LEFT" )
+	button:Hide()
+	
 	local turn = frame:CreateTexture( nil, "BACKGROUND" )
 	frame.turn = turn
 	turn:SetTexture( 0.1, 0.05, 0.0, 1 )
@@ -188,18 +226,23 @@ local function Constructor()
 	
 	local text = frame:CreateFontString()
 	text:SetFont( "Fonts\\ARIALN.TTF", 12 )
-	text:SetPoint( "LEFT", 150, 0 ) 
+	text:SetPoint( "LEFT", 130, 0 ) 
 	frame.text_gold = text
 	
 	local text = frame:CreateFontString()
 	text:SetFont( "Fonts\\ARIALN.TTF", 12 )
-	text:SetPoint( "LEFT", 300, 0 ) 
+	text:SetPoint( "LEFT", 220, 0 ) 
 	frame.text_bet = text
 	
 	local text = frame:CreateFontString()
 	text:SetFont( "Fonts\\ARIALN.TTF", 12 )
-	text:SetPoint( "LEFT", 450, 0 ) 
+	text:SetPoint( "LEFT", 330, 0 ) 
 	frame.text_status = text
+	
+	local text = frame:CreateFontString()
+	text:SetFont( "Fonts\\ARIALN.TTF", 12 )
+	text:SetPoint( "LEFT", 440, 0 ) 
+	frame.text_cards = text
 	 
 	frame:SetScript( "OnEnter", Control_OnEnter )
 	frame:SetScript( "OnLeave", Control_OnLeave )

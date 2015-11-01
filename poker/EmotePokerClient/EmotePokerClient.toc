@@ -1,0 +1,9 @@
+## Interface: 60200
+## Title: Emote Poker Client
+## Notes: RP Poker Server
+## Version: 1.1
+
+embeds.xml
+
+EmotePokerClient.lua
+playerframe.lua

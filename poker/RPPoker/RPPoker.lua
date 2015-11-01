@@ -1,10 +1,14 @@
 local Main = RPPoker
+local PROTOCOL = 1
 
 -------------------------------------------------------------------------------
 Main.Game = {
  
 	history = {};
 	redo    = {};
+	
+	sending_status = false;
+	status_time = 0;
 }
 
 local DEFAULT_STATE = {
@@ -21,6 +25,7 @@ local DEFAULT_STATE = {
 	--   allin   if they are all in for the hand
 	--   folded  if they are folded for the rest of the hand
 	--   active  if they are sitting at the table.
+	--   show    if they are showing their hand
 
 -- nil assignments are just for documentation purpose
 
@@ -30,8 +35,8 @@ local DEFAULT_STATE = {
 
 -- TODO; copy these from config on game start
 	ante        = 0;
-	small_blind = 0;
-	big_blind   = 0;
+	small_blind = 5;
+	big_blind   = 10;
 	multiplier  = 0; -- init to 1.0?
 
 	deck        = {};
@@ -59,6 +64,7 @@ local DEFAULT_STATE = {
 	riverbet = nil;
 	
 	history_note = "";
+	
 }
 
 -------------------------------------------------------------------------------
@@ -67,8 +73,6 @@ function Main.Game:LoadState( state )
 		self[k] = v
 	end
 end
-
-Main.Game:LoadState( DEFAULT_STATE )
 
 -------------------------------------------------------------------------------
 local state_keys = {
@@ -151,6 +155,9 @@ local function CopyTable( tbl )
 	return copy
 end
 
+-- NOTE THIS FREE LINE HERE!
+Main.Game:LoadState( CopyTable(DEFAULT_STATE) )
+
 -------------------------------------------------------------------------------
 function Main.Game:CopyState()
 
@@ -171,6 +178,8 @@ end
 -------------------------------------------------------------------------------
 function Main.Game:SaveState()
 	Main.Config.db.char.state = self:CopyState()
+	
+	self:SendStatus()
 end
 
 -------------------------------------------------------------------------------
@@ -293,6 +302,10 @@ end
 function Main.Game:TogglePlayerBreak( name )
 	local p = self:GetPlayer(name)
 	if not p then return end
+	if not self.hand_complete then 
+		Main:Print( "Cannot switch during a hand." )
+		return
+	end
 	p.active = not p.active
 	
 	Main.UI:UpdatePlayerStatus()
@@ -338,7 +351,7 @@ end
 -------------------------------------------------------------------------------
 function Main.Game:GetPlayer( name )
 	for k,v in pairs(self.players) do
-		if v.name == name then return v end
+		if v.name == name then return v, k end
 	end
 end
 
@@ -350,8 +363,8 @@ end
 function Main.Game:AddPlayer( name, alias, credit ) 
 
 	for k,v in pairs(self.players) do
-		-- DEBUG BYPASS
---		if v.name == name then return end -- player already added
+
+		if v.name == name then return end -- player already added
 	end
 
 	Main.Game:PushHistory( "Add Player" )
@@ -438,6 +451,8 @@ end
 --
 function Main.Game:TellCards( player )
 	 
+	if not player.hand[1] then return end
+	
 	local msg = string.format( "<EP> Your cards: %s / %s (%s, %s). Credit: %dg",
 							   self:SmallCardName( player.hand[1] ),
 							   self:SmallCardName( player.hand[2] ),
@@ -446,7 +461,9 @@ function Main.Game:TellCards( player )
 							   player.credit )
 	
 	SendChatMessage( msg, "WHISPER", _, player.name )
-	
+	Main:SendCommMessage( "EPCARDS", 
+		Main:Serialize( PROTOCOL, player.hand[1], player.hand[2] ), 
+		"WHISPER", player.name )
 end
 
 -------------------------------------------------------------------------------
@@ -476,7 +493,13 @@ function Main.Game:TellActions()
 		table.insert( actions, "Fold" )
 	end
 	
-	msg = msg .. CommaList( actions )
+	msg = msg .. CommaList( actions ) 
+	
+	Main:UpdatePlayerRank( p )
+	
+	if Main:RankIndex( p.rank ) >= 1 then
+		msg = msg .. " || You have " .. Main:FormatRank( p.rank ) .. "."
+	end
 	
 	SendChatMessage( msg, "WHISPER", _, p.name )
 end
@@ -767,6 +790,10 @@ function Main.Game:PlayerBet( amount )
 	
 	self:PushHistory( "Player Bet" )
 	
+	if self.round == "POSTRIVER" and not self.riverbet then
+		self.riverbet = self.turn
+		
+	end
 	self:ResetActed()
 	p.acted = true
 	self:AddBet( p, amount )
@@ -1079,6 +1106,7 @@ function Main.Game:ProcessWinners()
 		local winner_and_names = {}
 		local winner_names = {}
 		for _,p in pairs( v.winners ) do
+			self.players[p].show = true
 			self.players[p].credit = self.players[p].credit + math.floor(v.amount/#v.winners)
 			table.insert( winner_names, self.players[p].alias )
 			iswinner[p] = true
@@ -1162,16 +1190,20 @@ function Main.Game:ProcessWinners()
 			showcards = false
 		end
 		
-		if not iswinner then
+		if not iswinner[index] then
 			local p = self.players[index]
 			
-			if showcards then
-				local rank = Main:FormatRank( p.rank )
-				Main:PartyPrint( "%s: %s", p.alias, string.upper( rank ))
-				Main.Emote:Add( "%s had %s.", rank )
-			else
-				Main:PartyPrint( "%s: MUCKED", p.alias )
-				Main.Emote:Add( "%s mucked %s hand.", rank, p.male and "his" or "her" )
+			if not p.folded then
+				if showcards then
+					local rank = Main:FormatRank( p.rank )
+					Main:PartyPrint( "%s: %s", p.alias, string.upper( rank ))
+					Main.Emote:Add( "%s had %s.", p.alias, rank )
+					p.show = true
+				else 
+					
+					Main:PartyPrint( "%s: MUCKED", p.alias )
+					Main.Emote:Add( "%s mucked %s hand.", p.alias, p.male and "his" or "her" )
+				end
 			end
 		end
 	end
@@ -1314,6 +1346,16 @@ function Main.Game:CheckPots()
 	end
 end
 
+local function SameValues( a, b )
+	if #a ~= #b then return false end
+	
+	local map = {}
+	for _,v in pairs(a) do map[v] = true end
+	for _,v in pairs(b) do if not map[v] then return false end end
+	
+	return true
+end
+
 -------------------------------------------------------------------------------
 -- Get the winners of the different pots
 --
@@ -1335,7 +1377,7 @@ function Main.Game:GetWinners( ranks )
 		local bet = 0
 		local amount = 0
 		local players = {}
-		local allplayers = {}
+		--local allplayers = {}
 		for k,v in pairs( self.players ) do
 			if bet2[k] > 0 then
 				if bet == 0 then 
@@ -1352,7 +1394,7 @@ function Main.Game:GetWinners( ranks )
 			if bet2[k] > 0 then
 				bet2[k] = bet2[k] - bet
 				amount = amount + bet
-				table.insert( allplayers, k )
+				--table.insert( allplayers, k )
 				if not v.folded then
 					table.insert( players, k )
 				end
@@ -1362,9 +1404,24 @@ function Main.Game:GetWinners( ranks )
 		table.insert( pots, { 
 			amount = amount; -- amount in the pot
 			players = players; -- eligible players
-			all = allplayers; -- all players who have contributed
+			--all = allplayers; -- all players who have contributed
 		})
 	end
+	
+	-- merge pots with the same winners
+	for i = 1,#pots do
+	
+		local j = i+1
+		while j <= #pots do
+			if SameValues( pots[i].players, pots[j].players ) then
+				pots[i].amount = pots[i].amount + pots[j].amount
+				table.remove( pots, j )
+			else
+				j = j + 1
+			end
+		end
+	end
+	
 	
 	if ranks then
 		for _,v in pairs( pots ) do
@@ -1431,11 +1488,13 @@ function Main.Game:DealHand()
 		v.bet    = 0
 		v.acted  = false
 		v.allin  = false
+		v.show   = false
 		
 		if not v.active or v.credit <= 0 then
 			-- sit out this hand
 			v.folded = true
 			v.acted  = true
+			v.active = false
 		end
 	end
 	
@@ -1568,8 +1627,15 @@ function Main.Game:CancelHand()
 	self.hand_complete = true
 	self.pot = 0
 	self.bet = 0
-	self:SaveState()
 	
+	for _,p in pairs( self.players ) do
+		p.credit = p.credit + p.bet
+		p.bet = 0
+	end
+	
+	Main:PartyPrint( "*** The current hand was cancelled. ***" )
+	
+	self:SaveState()
 	Main.UI:Update()
 end
 
@@ -1577,7 +1643,8 @@ end
 function Main.Game:Reset()
 	self:PushHistory( "Reset" )
 	
-	self:LoadState( DEFAULT_STATE )
+	self:LoadState( CopyTable(DEFAULT_STATE) )
+	
 	self:SaveState()
 	Main.UI:Update()
 end
@@ -1655,4 +1722,153 @@ function Main:ClearTurnTarget()
 		SetRaidTarget( turn_target, 0 ) 
 		turn_target = nil
 	end
+end
+
+-------------------------------------------------------------------------------
+function Main.Game:SendStatus()
+	if not IsInGroup() then return end
+	
+	if self.sending_status then return end
+	self.sending_status = true
+	
+	-- throttle to max every 2 seconds
+	if GetTime() < self.status_time + 2 then
+		Main:ScheduleTimer( function()
+			Main.Game:DoSendStatus()
+		end, self.status_time+2 - GetTime() )
+		
+		return
+	end
+	
+	self:DoSendStatus()
+	
+end
+
+-------------------------------------------------------------------------------
+function Main.Game:DoSendStatus()
+	
+	self.status_time = GetTime()
+	self.sending_status = false
+	
+	local msg = {}
+	
+	msg.p = {}
+	
+	for _,p in ipairs( self.players ) do
+		local data = {
+			n = p.name;
+			al = p.alias;
+			c = p.credit;
+			b = p.bet;
+			ai = p.allin;
+			f = p.folded;
+			ac = p.active;
+			z = p.acted;
+		}
+		if p.show then
+			data.h = p.hand
+		end
+		table.insert( msg.p, data )
+	end
+	
+	msg.d = self.dealer
+	--msg.an = self.ante
+	--msg.sb = self.small_blind
+	--msg.bb = self.big_blind
+	
+	msg.t = self.table
+	msg.tn = self.turn
+	msg.r = self.round
+	msg.rc = self.round_complete
+	msg.hc = self.hand_complete
+	msg.b = self.bet
+	
+	if self.raises >= self.max_raises then
+		msg.rs = 1
+	end
+	
+	
+	Main:SendCommMessage( "EPKSTATUS", Main:Serialize( PROTOCOL, msg ), "RAID" )
+end
+
+-------------------------------------------------------------------------------
+local function CheckHandComplete()
+	if not Main.Game.hand_complete then
+		Main:Print( "Cannot do that right now." )
+		return true
+	end
+end
+
+-------------------------------------------------------------------------------
+function Main.Game:ShuffleDealer()
+	if CheckHandComplete() then return end
+	
+	self:PushHistory( "Shuffle Dealer" )
+	
+	self.dealer = math.random( 1, #self.players )
+	
+	self:SaveState()
+	Main.UI:Update()
+end
+
+-------------------------------------------------------------------------------
+function Main.Game:MovePlayerUp( name )
+	if CheckHandComplete() then return end
+	
+	local p,idx = self:GetPlayer(name)
+	if idx == 1 then return end
+	
+	self:PushHistory( "Move Player Up" )
+	self.players[idx] = self.players[idx-1]
+	self.players[idx-1] = p
+	self:SaveState()
+	Main.UI:Update()
+end
+
+-------------------------------------------------------------------------------
+function Main.Game:MovePlayerDown( name )
+	if CheckHandComplete() then return end
+	
+	local p,idx = self:GetPlayer(name)
+	if idx == #self.players then return end
+	
+	self:PushHistory( "Move Player Down" )
+	self.players[idx] = self.players[idx+1]
+	self.players[idx+1] = p
+	self:SaveState()
+	Main.UI:Update()
+end
+
+-------------------------------------------------------------------------------
+function Main.Game:RetellCards( name )
+	local p = self:GetPlayer(name)
+	if not p then return end
+	self:TellCards( p )
+end
+
+-------------------------------------------------------------------------------
+function Main.Game:DrawACard( msg )
+	if CheckHandComplete() then return end
+	
+	local c = self:DrawCard()
+	
+	local text = string.format("draws a %s.", self:CardName(c))
+	
+	if msg == "new" then
+		self:NewDeck()
+		Main:Print( "Deck reset!" )
+	elseif msg == "instant" then
+		SendChatMessage( text, "EMOTE" )
+	else
+		Main.Emote:Add( text )
+	end
+end
+
+-------------------------------------------------------------------------------
+function SlashCmdList.EMOTEPOKER( msg )
+	Main.UI.frame:Show()
+end
+
+function SlashCmdList.DRAWCARD( msg )
+	Main.Game:DrawACard( msg )
 end

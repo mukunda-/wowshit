@@ -14,31 +14,59 @@ local Module = Main.UI
 function Main.UI:Init() 
  
 	local f = AceGUI:Create( "Frame" )
-	f:SetTitle( "RPPoker" )
+	f:SetTitle( "EmotePoker" )
 	f:SetStatusText( "Status Bar" )
 	f:SetLayout( "Flow" ) 
-	 
+	f:Hide()
+	
+	local e
+	
+	e = AceGUI:Create( "Label" )
+	e:SetFullWidth( true )
+	e:SetText( "Table Cards:" )
+	e:SetFont( "Fonts\\ARIALN.TTF", 16 )
+	f:AddChild( e )
+	self.tablecards = e 
+	
 	self.playergroup = AceGUI:Create( "InlineGroup" )
 	self.playergroup:SetFullWidth( true )
 	f:AddChild( self.playergroup )
 	
-	local button = AceGUI:Create( "Button" )
+	local button 
+	
+	button = AceGUI:Create( "Button" )
 	button:SetText( "Add Player" )
 	button:SetCallback( "OnClick", self.AddPlayerClicked )
+	button:SetWidth( 100 )
 	f:AddChild( button ) 
 	
-	local button = AceGUI:Create( "Button" )
+	
+	button = AceGUI:Create( "Button" )
 	button:SetText( "Undo" )
 	button:SetCallback( "OnClick", self.UndoClicked )
+	button:SetWidth( 100 )
 	f:AddChild( button ) 
 	self.undo_button = button
 	
-	local button = AceGUI:Create( "Button" )
+	button = AceGUI:Create( "Button" )
 	button:SetText( "Redo" )
 	button:SetCallback( "OnClick", self.RedoClicked )
+	button:SetWidth( 100 )
 	f:AddChild( button ) 
 	self.redo_button = button
 	
+	button = AceGUI:Create( "Button" )
+	button:SetText( "Actions" )
+	button:SetCallback( "OnClick", function() Main:ShowActionsPopup() end )
+	button:SetWidth( 100 )
+	f:AddChild( button )
+	
+	button = AceGUI:Create( "Button" )
+	button:SetText( "Resend" )
+	button:SetCallback( "OnClick", function() Main.Game:SendStatus() end )
+	button:SetWidth( 100 )
+	f:AddChild( button )
+	 
 	self.pactions = {}
 	
 	local playeractions = AceGUI:Create( "InlineGroup" )
@@ -48,18 +76,17 @@ function Main.UI:Init()
 	f:AddChild( playeractions )
 	self.pactions.frame = playeractions
 	
-	local e
 	
 	e = AceGUI:Create( "Button" )
 	e:SetText( "Call" )
-	e:SetWidth( 120 )
+	e:SetWidth( 90 )
 	e:SetCallback( "OnClick", self.PlayerActionCall )
 	playeractions:AddChild( e )
 	self.pactions.call = e
 	
 	e = AceGUI:Create( "Button" )
 	e:SetText( "Bet" )
-	e:SetWidth( 120 )
+	e:SetWidth( 90 )
 	e:SetCallback( "OnClick", self.PlayerActionBet )
 	playeractions:AddChild( e )
 	self.pactions.bet = e
@@ -67,20 +94,20 @@ function Main.UI:Init()
 	e = AceGUI:Create( "EditBox" )
 	e:DisableButton( true )
 	e:SetLabel( "Bet Amount" )
-	e:SetWidth( 120 )
+	e:SetWidth( 90 )
 	playeractions:AddChild( e )
 	self.pactions.betamt = e
 	
 	e = AceGUI:Create( "Button" )
 	e:SetText( "Fold" )
-	e:SetWidth( 120 )
+	e:SetWidth( 90 )
 	e:SetCallback( "OnClick", self.PlayerActionFold )
 	playeractions:AddChild( e )
 	self.pactions.fold = e
 	
 	e = AceGUI:Create( "Button" )
 	e:SetText( "All-in" )
-	e:SetWidth( 120 )
+	e:SetWidth( 90 )
 	e:SetCallback( "OnClick", self.PlayerActionAllIn )
 	playeractions:AddChild( e )
 	self.pactions.allin = e
@@ -354,8 +381,20 @@ function Main.UI.RedoClicked()
 end
 
 -------------------------------------------------------------------------------
+function Main.UI:UpdateTableCards()
+	local cards = ""
+	for _, c in ipairs( Main.Game.table ) do
+		if cards ~= "" then cards = cards .. " / " end
+		cards = cards .. Main.Game:SmallCardName( c )
+	end
+	
+	self.tablecards:SetText( "Table Cards: " .. cards )
+end
+
+-------------------------------------------------------------------------------
 function Main.UI:Update()
 	self:UpdatePlayerStatus()
+	self:UpdateTableCards()
 	
 	self.undo_button:SetDisabled( not Main.Game.history[1] )
 	self.redo_button:SetDisabled( not Main.Game.redo[1] )
@@ -382,7 +421,7 @@ function Main.UI:Update()
 				self.pactions.call:SetDisabled( true )
 			end
 			
-			if p.credit <= ca then
+			if p.credit <= ca or Main.Game.raises >= Main.Game.max_raises then
 				self.pactions.bet:SetDisabled( true )
 				self.pactions.betamt:SetDisabled( true )
 			end
@@ -433,6 +472,8 @@ function Main.UI:Update()
 		self.options.smallblind:SetDisabled( true )
 		self.options.bigblind:SetDisabled( true )
 	end
+	
+	
 end
 
 -------------------------------------------------------------------------------

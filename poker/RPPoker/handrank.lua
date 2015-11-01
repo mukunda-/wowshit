@@ -9,7 +9,7 @@ local Main = RPPoker
 --
 
 local RankStrings = {
-	[0] = "a High Card";
+	[0] = "nothing";
 	[1] = "a Pair";
 	[2] = "two Pairs";
 	[3] = "a Three of a Kind";
@@ -362,3 +362,88 @@ function Main:FormatRank( rank )
 	local r = math.floor(rank / 1048576)
 	return RankStrings[r]
 end
+
+-------------------------------------------------------------------------------
+function Main:RankIndex( rank )
+	return math.floor(rank / 1048576)
+end
+
+--[[ UNIT TESTING!
+
+local function GetTestCards( ... )
+	local cards = {}
+	for i = 1, select("#",...) do
+		local v = select( i, ... )
+		local n, s = string.match( v, "([0-9AJQK]+)([shdc])" )
+		if n == 'A' then n = 1
+		elseif n == 'J' then n = 11
+		elseif n == 'Q' then n = 12
+		elseif n == 'K' then n = 13
+		else
+			n = tonumber(n) 
+			if n then
+				if n < 2 or n > 10 then n = nil end
+			end
+		end
+		
+		if not n then error( "Invalid card: " .. v ) end
+		n = n - 1
+		
+		if s == 'c' then s = 0
+		elseif s == 'd' then s = 1 
+		elseif s == 'h' then s = 2
+		elseif s == 's' then s = 3 
+		else 
+			error( "Invalid card: " .. v ) 
+		end
+		
+		table.insert( cards, n*4+s+1 )
+		
+	end
+	
+	return cards
+end
+
+local function TEST_EQ( rank, ... )
+	cards = GetTestCards( ... )
+	local r = Main:ComputeHandRank( cards )
+	
+	if Main:RankIndex( r ) ~= rank then
+		print( "Test failed. Cards = ", cards[1], cards[2], cards[3], cards[4], cards[5], cards[6], cards[7] )
+		error( "TEST FAILED r=".. Main:FormatRank(r) )
+	end
+end
+
+local function TestHandRanks()
+
+	local gr = function( ... ) return Main:ComputeHandRank( GetTestCards( ... )) end
+	
+	TEST_EQ( 0, "Ah", "Kh", "5d", "4d", "9s", "10s", "3h" )
+	TEST_EQ( 1, "Ah", "As", "5d", "4d", "9s", "10s", "3h" )
+	TEST_EQ( 2, "Kd", "Kh", "5d", "4d", "9s", "9d" , "3h" )
+	TEST_EQ( 3, "Kd", "Kh", "Kc", "4d", "9s", "10s", "3h" )
+	TEST_EQ( 4, "Ah", "2d", "5s", "4d", "9s", "10s", "3h" )
+	TEST_EQ( 4, "Ah", "2d", "5s", "6s", "4s", "10s", "3h" )
+	TEST_EQ( 4, "Ah", "Kd", "Qs", "Jh", "4s", "10s", "3h" )
+	TEST_EQ( 5, "Ah", "Kh", "Qh", "Jh", "4s", "10s", "3h" )
+	TEST_EQ( 6, "Ah", "Kd", "Qd", "As", "Ad", "10d", "10d" ) -- deliberate double card
+	TEST_EQ( 7, "Ah", "Kd", "Ks", "As", "Ad", "Kc" , "Ac" ) 
+	TEST_EQ( 8, "9h", "10h", "Jh", "Qh", "Kh", "As", "Ac" ) 
+	TEST_EQ( 9, "9h", "10h", "Jh", "Qh", "Kh", "Ah", "Ac" ) 
+	TEST_EQ( 4, "9h", "10h", "Jh", "Qh", "Ks", "As", "Ac" )
+	
+	assert( gr( "9h", "10h", "Jh", "Qh", "Kh", "As", "Ac" ) == gr( "9h", "10h", "Jh", "Qh", "Kh", "9s", "Ac" ) )
+	assert( gr( "9h", "10h", "Jh", "Qh", "Kh", "As", "Ac" ) == gr( "9h", "10h", "Jh", "Qh", "Kh", "9s", "9c" ) )
+	assert( gr( "9h", "10h", "Jh", "Qh", "Kh", "As", "Ac" ) == gr( "9h", "10h", "Jh", "Qh", "Kh", "9s", "2c" ) )
+	
+	assert( gr( "9h", "10h", "Jh", "Qh", "Kh", "8h", "Ac" ) > gr( "9h", "10h", "Jh", "Qh", "Ah", "8h", "2c" ) )
+	assert( gr( "9h", "10h", "Jh", "Qh", "Kh", "10h", "Ac" ) > gr( "9h", "10h", "Jh", "Qh", "Ks", "9s", "2c" ) )
+	assert( gr( "9h", "9s",  "9d", "9c", "Kh", "10h", "Ac" ) > gr( "9h", "10h", "Jh", "Qh", "Ks", "9s", "2c" ) )
+	
+	
+	print( "|cff00ff00EMOTEPOKER HANDRANK TESTS PASSED!" )
+end
+
+TestHandRanks()
+
+--]]
