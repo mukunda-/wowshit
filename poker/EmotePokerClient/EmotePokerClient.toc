@@ -1,7 +1,7 @@
 ## Interface: 60200
 ## Title: Emote Poker Client
 ## Notes: RP Poker Server
-## Version: 1.1
+## Version: 1.2
 
 embeds.xml
 

@@ -1,5 +1,4 @@
-
-local VERSION = "1.1"
+ 
 local PROTOCOL = 1
 
 EmotePokerClient = LibStub( "AceAddon-3.0" ):NewAddon( 
@@ -204,6 +203,7 @@ function Main:UpdateStatus( msg )
 		local ca = self.state.bet - p.bet
 		if ca <= 0 then
 			table.insert( actions, "Check" )
+			table.insert( actions, "Bet" )
 			
 		else
 			if p.credit <= ca then
