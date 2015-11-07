@@ -1852,13 +1852,34 @@ function Main.Game:DrawACard( msg )
 	
 	local c = self:DrawCard()
 	
-	local text = string.format("draws a %s.", self:CardName(c))
+	local card = self:CardName(c)
+	local s = card:sub(1,1)
+	if s == 'A' or s == 'E' then
+		card = "an " .. card
+	else
+		card = "a " .. card
+	end
+	
+	local text = string.format( "draws %s.", card )
 	
 	if msg == "new" then
 		self:NewDeck()
 		Main:Print( "Deck reset!" )
 	elseif msg == "instant" then
 		SendChatMessage( text, "EMOTE" )
+	elseif msg == "give" or msg == "givedeal" then
+		local target = UnitName("player")
+		if UnitExists( "target" ) and UnitIsPlayer( "target" ) and UnitIsFriend( "target", "player" ) then
+			target = UnitName("target")
+		end
+		
+		if msg == "give" then
+			text = string.format( "-gives you %s.", card )
+		elseif msg == "givedeal" then
+			text = string.format( "-deals you %s.", card )
+		end
+		
+		SendChatMessage( text, "WHISPER", _, target )
 	else
 		Main.Emote:Add( text )
 	end
