@@ -1,0 +1,11 @@
+## Interface: 60200
+## Title: Survey Hunt
+## Notes: Survey Hunt Server
+## SavedVariables: SurveyHuntSaved
+## OptionalDependencies: GHI
+## Version: 1.0
+
+embeds.xml
+
+SurveyHunt.lua
+
