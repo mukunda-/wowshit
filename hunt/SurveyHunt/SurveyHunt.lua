@@ -8,12 +8,14 @@ SurveyHunt = LibStub( "AceAddon-3.0" ):NewAddon(
 
 local Main = SurveyHunt
  
-local FRAMEWIDTH = 400
-local FRAMEHEIGHT = 300
+local FRAMEWIDTH = 300
+local FRAMEHEIGHT = 400
 
 local DIGCD = 3
-local CHECKCD = 30
-local DIGTHRESHOLD = 40
+local CHECKCD = 5
+local DIGTHRESHOLD = 50
+
+local zone = "The Hinterlands"
 
 Main.spots = {}
 Main.pdata = {}
@@ -27,6 +29,17 @@ function Main:LoadData()
 	SurveyHuntSaved = SurveyHuntSaved or {}
 	self.spots = SurveyHuntSaved.spots or {}
 end
+
+-------------------------------------------------------------------------------
+function GetPos( player )
+	local y, x = UnitPosition( player )
+	
+	if not y then return 0,0 end
+	
+	y = -y 
+	x = -x
+	return x, y
+end
   
 -------------------------------------------------------------------------------
 function Main:OnInitialize() 
@@ -35,14 +48,15 @@ function Main:OnInitialize()
 	
 	SLASH_SCH1 = "/sch"
 	
-	GHI_Comm().AddReceiveFunc( "SCH_DIG", OnGhiDig )
-	GHI_Comm().AddReceiveFunc( "SCH_CHECK", OnGhiCheck )
 end 
 
 -------------------------------------------------------------------------------
 function Main:OnEnable() 
 	self:ShowFrame()
 	self.frame:Hide()
+	
+	GHI_Comm().AddRecieveFunc( "SCH_DIG", OnGhiDig )
+	GHI_Comm().AddRecieveFunc( "SCH_CHECK", OnGhiCheck )
 end
 
 -------------------------------------------------------------------------------
@@ -89,7 +103,7 @@ function Main:ShowFrame()
 		  
 		local status = f:CreateFontString()
 		status:SetAllPoints()
-		status:SetFont( "Fonts\\ARIALN.TTF", 14, "OUTLINE" )
+		status:SetFont( "Fonts\\ARIALN.TTF", 8, "OUTLINE" )
 		self.status = status
 		
 		self:UpdateStatusText()
@@ -100,13 +114,11 @@ end
 
 -------------------------------------------------------------------------------
 function OnGhiDig( name )
-	
 	if not UnitInParty( name ) then
 		return
 	end
 	
-	print( name )
-	self:Dig( name, "addon" )
+	Main:Dig( name, "addon" )
 end
 
 -------------------------------------------------------------------------------
@@ -115,32 +127,8 @@ function OnGhiCheck( name )
 		return
 	end
 	
-	print( name )
-end
-
--------------------------------------------------------------------------------
-function Main:OnCommReceived( prefix, msg, dist, sender )
-
-	sender = Ambiguate( sender, "none" )
-	
-	if prefix ~= "GHI2" then return end
-	
-	local data,data2 = self:Deserialize(msg)
-	
-	if not UnitInParty( sender ) then
-		return
-	end
-	
-	if prefix == "SURVEYHUNT" then
-		
-		if msg == "DIG" then
-			self:Dig( sender, "addon" )
-		elseif msg == "CHECK" then
-			self:Check( sender, "addon" )
-		end
-		
-	end 
-end
+	Main:Check( name, "addon" )
+end 
 
 -------------------------------------------------------------------------------
 function Main:OnWhisper( event, msg, sender )
@@ -158,7 +146,7 @@ function Main:OnWhisper( event, msg, sender )
 end
 
 -------------------------------------------------------------------------------
-function SetupPD( player )
+function Main:SetupPD( player )
 	if not self.pdata[player] then
 		self.pdata[player] = {
 			digtime = 0;
@@ -175,33 +163,37 @@ function Main:Dig( player, response )
 			
 			SendChatMessage( "<The shovel works! But the hunt hasn't started.>", "WHISPER", _, player  )
 		elseif response == "addon" then
-			GHI_Comm().Send( "NORMAL", player, "SCH_DIG", "|cff0000ffThe shovel works, but the hunt hasn't started!" )
+		
+			GHI_Comm().Send( "ALERT", player, "SCH_DIGR", "|cffff33ffThe shovel works, but the hunt hasn't started!", "", "" )
 		end
 		return
 	end
 	
 	local pd = self.pdata
-	SetupPD( player )
+	self:SetupPD( player )
+	pd = pd[player]
 	
-	if GetTime() - pd[player].digtime < DIGCD then
+	if GetTime() - pd.digtime < DIGCD then
 		return
 	end
 	
-	pd[player].digtime = GetTime()
+	pd.digtime = GetTime()
 	
-	local x,y = UnitPosition( player )
+	local x,y = GetPos( player )
 	
 	for k,v in pairs( self.spots ) do
-		if Distance2( v.x, v.y, x, y ) < DIGTHRESHOLD then
+		if not v.found and Distance2( v.x, v.y, x, y ) < DIGTHRESHOLD then
 			v.found = player
 			
 			if response == "whisper" then
-				SendChatMessage( "<You found \"" .. v.name .. "\"!> (Keep hunting, and claim the prize later from Tammy!)", "WHISPER", _, player )
+				SendChatMessage( "<You found [" .. v.name .. "]!> (Keep hunting, and claim the prize later from Tammy!)", "WHISPER", _, player )
 			elseif response == "addon" then
 				
-				GHI_Comm().Send( "NORMAL", player, "SCH_DIG", "|cff00ff00You found \"" .. v.name .. "\"! |cff808080(Keep hunting, and claim the prize later from Tammy!)" )
+				GHI_Comm().Send( "ALERT", player, "SCH_DIGR", "|cff00ff00You found |cffffffff[" .. v.name .. "]|cff00ff00! |cff808080(Keep hunting, and claim the prize later from Tammy!)", "", "" )
 			end
 			
+			self:UpdateStatusText()
+			self:SaveData()
 			return
 		end
 	end
@@ -209,8 +201,9 @@ function Main:Dig( player, response )
 	if response == "whisper" then
 		SendChatMessage( "<There's nothing here!>", "WHISPER", _, player  )
 	elseif response == "addon" then
-		GHI_Comm().Send( "NORMAL", player, "SCH_DIG", "|cff808080There's nothing here!", "WHISPER" )
+		GHI_Comm().Send( "ALERT", player, "SCH_DIGR", "|cff808080There's nothing here!", "", "" )
 	end
+	
 end
 
 -------------------------------------------------------------------------------
@@ -222,20 +215,105 @@ function Main:Check( player, response )
 			SendChatMessage( "<The tracker works! But the hunt hasn't started.>", "WHISPER", _, player  )
 		elseif response == "addon" then
 		
-			GHI_Comm().Send( "NORMAL", player, "SCH_CHECK", "|cff0000ffThe tracker works, but the hunt hasn't started!" )
+			GHI_Comm().Send( "ALERT", player, "SCH_CHECKR", "|cffff33ffThe tracker works, but the hunt hasn't started!", "", "" )
 		end
 		
 		return
 	end
+	
+	local pd = self.pdata
+	self:SetupPD( player )
+	pd = pd[player]
+	
+	if GetTime() - pd.checktime < CHECKCD then
+		local cd = math.ceil(CHECKCD - (GetTime() - pd.checktime))
+		
+		if response == "whisper" then
+			SendChatMessage( "<You can't scan again for another " .. cd .. " seconds.>", "WHISPER", _, player )
+		elseif response == "addon" then
+			GHI_Comm().Send( "ALERT", player, "SCH_CHECKR", "|cff808080You can't scan again for another " .. cd .. " seconds.", "", "" )
+		end
+		
+		return
+	end
+	
+	pd.checktime = GetTime()
+	
+	local k = self:GetNearestSpot( player, true )
+	
+	if k then
+		
+		local x,y = self.spots[k].x, self.spots[k].y
+		local x2,y2 = GetPos( player )
+		
+		
+		x = x-x2
+		y = y-y2
+		
+		local dist = x*x+y*y
+		
+		local dcol
+		local dplain 
+		
+		if dist < 40 * 40 then
+			dcol = "|cFF00FF00CLOSE|r"
+			dplain = "CLOSE"
+		elseif dist < 90 * 90 then
+			dcol = "|cFFFFFF00MEDIUM|r"
+			dplain = "MEDIUM"
+		else
+			dcol = "|cFFFF2000FAR|r"
+			dplain = "FAR"
+		end
+		
+		
+		local angle = math.atan2( y, x )
+		if angle < 0 then angle = math.pi * 2 + angle end
+		local p = math.pi * 2 / 8
+		angle = angle + p / 2
+		if angle > math.pi*2 then angle = angle - math.pi*2 end
+		local index = math.floor(angle / p)
+		
+		local directions = { "EAST", "SOUTHEAST", "SOUTH", "SOUTHWEST", "WEST", "NORTHWEST", "NORTH", "NORTHEAST", "EAST" }
+		local direction = directions[index+1]
+	
+		
+		if response == "whisper" then
+			SendChatMessage( "<The tracker reads, \"RANGE: " .. dplain .. " || DIRECTION: " .. direction .. "\">", "WHISPER", _, player  )
+		elseif response == "addon" then
+			GHI_Comm().Send( "ALERT", player, "SCH_CHECKR", "|cff80ffffThe tracker reads, \"RANGE: " .. dcol .. "|cff80ffff | DIRECTION: |cffffffff" .. direction .. "|cff80ffff\"", "", "" )
+		end
+		
+	else
+		
+		if response == "whisper" then
+			SendChatMessage( "<There's no more treasure! Return to base!>", "WHISPER", _, player  )
+		elseif response == "addon" then
+			GHI_Comm().Send( "ALERT", player, "SCH_CHECKR", "|cff808080There's no more treasure! Return to base!", "", "" )
+		end
+	end
+	
 end
 
 -------------------------------------------------------------------------------
-function Main:AddSpot( name )
-	local x,y = UnitPosition( "player" )
+function Main:AddSpot( msg )
+	
+	local x,y,name = string.match( msg, "add (-?%d+) (-?%d+) (.+)" )
+	if not x then
+		x,y = GetPos( "player" )
+		name = string.sub(msg,5)
+	end
+	
+	if name == "" then
+		print( "NAME MISSING!" )
+		return
+	end
+	
 	table.insert( self.spots, { x = x, y = y, name = name } )
 	
 	self:UpdateStatusText()
-	print( "SPOT ADDED" )
+	
+	print( string.format("/sch add %d %d %s", x, y, name)  )
 	
 	self:ShowFrame()
 	self:SaveData()
@@ -247,22 +325,44 @@ function Distance2( x,y, x2,y2 )
 end
 
 -------------------------------------------------------------------------------
-function Main:RemoveSpot()
-	local x,y = UnitPosition( "player" )
+function Main:GetNearestSpot( player, unfound )
+	local x,y = GetPos( player )
 	-- findclosest point
 	
 	local best
 	local distance = 999999*999999
 	
 	for k,v in pairs( self.spots ) do
-		if Distance2( v.x, v.y, x, y ) < distance then
-			best = k
+		local d = Distance2( v.x, v.y, x, y )
+		if d < distance then 
+			if not v.found or not unfound then
+				best = k
+				distance = d
+			end
 		end
 	end
 	
-	if best then
-		table.remove( self.spots, k )
-		print( "SPOT REMOVED" )
+	if best then 
+		return best
+	end
+	
+	return  nil
+end
+
+-------------------------------------------------------------------------------
+function Main:RemoveSpot( index )
+
+	if not index then
+		index = self:GetNearestSpot( "player" )
+	end
+	
+	if index then
+		
+		if self.spots[index] then
+			table.remove( self.spots, index )
+			print( "SPOT REMOVED" )
+		end
+		
 	end
 	
 	self:ShowFrame()
@@ -281,7 +381,7 @@ end
 -------------------------------------------------------------------------------
 function Main:UpdateStatusText()
 
-	local result = "SCAVENGER HUNT STATUS|n"
+	local result = "SCAVENGER HUNT STATUS " .. (self.on and "(ACTIVE)" or "(INACTIVE)") .. "|n"
 	
 	for k,v in ipairs( self.spots ) do
 		local color
@@ -303,7 +403,33 @@ end
 
 -------------------------------------------------------------------------------
 function Main:ActivateHunt( on )
-	main.on = on
+	self.on = on
+	if on then
+		print( "SURVEY HUNT ACTIVATED" )
+	else
+		print( "SURVEY HUNT DEACTIVATED" )
+	end
+	self:ShowFrame()
+	self:UpdateStatusText()
+	self:SaveData()
+end
+
+function Main:Unclaim( index )
+	index = tonumber(index)
+	if not index then return end
+	
+	if self.spots[index] then
+	
+		self.spots[index].found = nil
+		
+		self:ShowFrame()
+		self:UpdateStatusText()
+		self:SaveData()
+		print( "SPOT UNCLAIMED" )
+		return
+	end
+	
+	print( "UNKNOWN SPOT", index )
 end
 
 -------------------------------------------------------------------------------
@@ -318,15 +444,17 @@ function SlashCmdList.SCH( msg )
 	if args[1] == "show" then
 		Main:ShowFrame()
 	elseif args[1] == "add" then
-		Main:AddSpot( msg:sub(5) )
+		Main:AddSpot( msg )
 	elseif args[1] == "remove" then
-		Main:RemoveSpot()
+		Main:RemoveSpot( args[2] )
 	elseif args[1] == "eraseall" then
 		Main:EraseAll()
 	elseif args[1] == "on" then
 		Main:ActivateHunt( true )
 	elseif args[1] == "off" then
 		Main:ActivateHunt( false )
+	elseif args[1] == "unclaim" then
+		Main:Unclaim( args[2] )
 	end
 end
 
